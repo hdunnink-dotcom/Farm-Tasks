@@ -67,7 +67,7 @@ export const plannerTools = [
   },
   {
     name: "farm_update_task",
-    description: "Change a task: reschedule (dates/time), assign people, rename, change urgency, notes, steps or recurrence, or mark done/undone. Only send the fields to change. Tasks imported from Google Calendar take their date from the calendar; move those in Google Calendar instead.",
+    description: "Change a task: reschedule (dates/time), assign people, rename, change urgency, notes, steps or recurrence, or mark done/undone. Only send the fields to change. For tasks imported from Google Calendar, a new date/time, title, notes or location is also written to the calendar event (one date only; the read-only Hirshberg public feed can't be changed).",
     inputSchema: {
       type: "object",
       properties: { taskId: { type: "string" }, ...taskFields, done: { type: "boolean" } },

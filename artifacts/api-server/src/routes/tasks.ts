@@ -25,6 +25,7 @@ import {
   type TaskRecurrence,
 } from "../lib/farm-sheet";
 import type { SheetTask } from "../lib/farm-sheet";
+import { CalendarWritebackError, writeBackToCalendar, type CalendarChange } from "../lib/calendar-writeback";
 import { listReadyAttachments } from "../lib/farm-attachments";
 import { currentMember, isMaster, requireMember } from "../lib/farm-access";
 import { normalizeSheetTaskInput } from "../lib/task-input-normalization";
@@ -201,6 +202,27 @@ const router: IRouter = Router();
 
 function taskAssignedTo(task: { assigneeIds?: string[]; assigneeId?: string }, memberId: string): boolean {
   return task.assigneeIds?.includes(memberId) === true || task.assigneeId === memberId;
+}
+
+
+function sameStart(a: string, b: string): boolean {
+  if (!a || !b) return a === b;
+  if (a.includes("T") !== b.includes("T")) return false;
+  return a.includes("T") ? Date.parse(a) === Date.parse(b) : a.slice(0, 10) === b.slice(0, 10);
+}
+
+/** What an edit changes on a calendar-imported task's source event. */
+function calendarChangeFor(existing: SheetTask, input: Partial<SheetTask>): CalendarChange | { error: string } {
+  const change: CalendarChange = {};
+  if (input.calendarStart !== undefined || input.scheduledDates !== undefined) {
+    const target = input.calendarStart || input.scheduledDates?.[0] || "";
+    if (!target) return { error: "Calendar tasks always need a date. Delete the event in Google Calendar to remove it." };
+    if (!sameStart(target, existing.calendarStart)) change.start = target;
+  }
+  if (input.task !== undefined && input.task.trim() !== existing.task.trim()) change.task = input.task;
+  if (input.notes !== undefined && input.notes.trim() !== existing.notes.trim()) change.notes = input.notes;
+  if (input.location !== undefined && input.location.trim() !== existing.location.trim()) change.location = input.location;
+  return change;
 }
 
 async function authorizedAssignments(input: {
@@ -479,6 +501,26 @@ router.patch("/tasks/:taskId", async (req, res): Promise<void> => {
         notes: body.data.notes,
         reviewStatus: existing.reviewStatus === "pending" ? "pending" as const : existing.reviewStatus,
       };
+    if (isMaster(member) && existing.source === "Google Calendar") {
+      // Changes to an imported calendar task are written to its Google
+      // Calendar event first, so the calendar sync keeps them.
+      const change = calendarChangeFor(existing, sheetInput as Partial<SheetTask>);
+      if ("error" in change) {
+        res.status(400).json({ error: change.error });
+        return;
+      }
+      if (Object.keys(change).length) {
+        try {
+          Object.assign(input, await writeBackToCalendar(existing, change));
+        } catch (error) {
+          if (error instanceof CalendarWritebackError) {
+            res.status(error.status === 403 ? 403 : 400).json({ error: error.message });
+            return;
+          }
+          throw error;
+        }
+      }
+    }
     const task = await updateSheetTask(
       params.data.taskId,
       input,

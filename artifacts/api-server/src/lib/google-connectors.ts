@@ -16,6 +16,8 @@ export const GOOGLE_SCOPES = [
   "email",
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/calendar.readonly",
+  // Moving or editing a calendar-imported task in the planner updates its event.
+  "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/drive",
   "https://www.googleapis.com/auth/gmail.readonly",
 ];
