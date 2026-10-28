@@ -205,6 +205,26 @@ function taskAssignedTo(task: { assigneeIds?: string[]; assigneeId?: string }, m
 }
 
 
+
+function aucklandDayKey(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland", year: "numeric", month: "2-digit", day: "2-digit" }).format(instant);
+}
+
+/** The one date a calendar task should move to when several were sent. */
+function singleCalendarDate(existing: SheetTask, input: { calendarStart?: string; scheduledDates?: string[] }): { date: string } | { error: string } | null {
+  const dates = input.scheduledDates;
+  if (!dates || dates.length <= 1) return null;
+  const startDay = input.calendarStart ? aucklandDayKey(input.calendarStart) : "";
+  if (startDay && dates.includes(startDay)) return { date: startDay };
+  const currentDay = aucklandDayKey(existing.calendarStart);
+  const others = dates.filter((date) => date !== currentDay);
+  if (others.length === 1) return { date: others[0]! };
+  return { error: "A calendar task can only be on one day. Pick one date, or add a separate task for the extra day." };
+}
+
 function sameStart(a: string, b: string): boolean {
   if (!a || !b) return a === b;
   if (a.includes("T") !== b.includes("T")) return false;
@@ -468,6 +488,25 @@ router.patch("/tasks/:taskId", async (req, res): Promise<void> => {
         ? "Weekly tasks require a scheduled calendar start."
         : "Recurring tasks require a scheduled calendar start." });
       return;
+    }
+    if (existing.source === "Google Calendar") {
+      // A calendar event has one date. Moves from the planner can arrive as
+      // [old day, new day]; treat that as a move to the day chosen.
+      const requested = { calendarStart: body.data.calendarStart, scheduledDates: sheetInput.scheduledDates };
+      const collapsed = singleCalendarDate(existing, requested);
+      if (collapsed && "error" in collapsed) {
+        res.status(400).json({ error: collapsed.error });
+        return;
+      }
+      if (collapsed) {
+        const schedule = sheetInput as { calendarStart?: string; scheduledDates?: string[] };
+        schedule.scheduledDates = [collapsed.date];
+        // Keep a chosen time on that day; otherwise move by date (the event keeps its time).
+        const rawStart = body.data.calendarStart ?? "";
+        schedule.calendarStart = rawStart.includes("T") && aucklandDayKey(rawStart) === collapsed.date
+          ? new Date(rawStart).toISOString()
+          : collapsed.date;
+      }
     }
     const effectiveScheduledDates = sheetInput.scheduledDates ?? taskScheduledDates(existing);
     if (effectiveScheduledDates.length > 1 && (existing.source === "Google Calendar" || effectiveRecurrence !== "none")) {
