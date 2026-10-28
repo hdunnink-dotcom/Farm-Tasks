@@ -1,11 +1,12 @@
 # Build the container and deploy it to Cloud Run (Sydney).
-#   gcloud builds submit --config cloudbuild.yaml \
-#     --substitutions=_CLERK_PUBLISHABLE_KEY=pk_...
+#   gcloud builds submit --config cloudbuild.yaml
 substitutions:
   _REGION: australia-southeast1
   _SERVICE: farm-tasks
   _REPO: farm-tasks
-  _CLERK_PUBLISHABLE_KEY: ""
+  # Clerk publishable key: public by design (it ships in the web page), so it
+  # lives here. A trigger substitution with the same name overrides it.
+  _CLERK_PUBLISHABLE_KEY: "pk_test_c3VpdGVkLXNoZXBoZXJkLTUwODIuY2xlcmsuYWNjb3VudHMuZGV2JA"
 steps:
   - name: gcr.io/cloud-builders/docker
     args:
