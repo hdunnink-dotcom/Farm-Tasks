@@ -1,0 +1,30 @@
+# Build the container and deploy it to Cloud Run (Sydney).
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --substitutions=_CLERK_PUBLISHABLE_KEY=pk_...
+substitutions:
+  _REGION: australia-southeast1
+  _SERVICE: farm-tasks
+  _REPO: farm-tasks
+  _CLERK_PUBLISHABLE_KEY: ""
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg=VITE_CLERK_PUBLISHABLE_KEY=${_CLERK_PUBLISHABLE_KEY}
+      - -t=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID
+      - .
+  - name: gcr.io/cloud-builders/docker
+    args: [push, "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID"]
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID
+      - --region=${_REGION}
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID
+options:
+  substitution_option: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY

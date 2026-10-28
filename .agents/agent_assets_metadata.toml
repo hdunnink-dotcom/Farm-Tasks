@@ -1,0 +1,24 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "hVPa4YDjGrHu-ZhLfEXEP"
+uri = "file://attached_assets/Farm_Orchard_Task_Template.csv"
+type = "table"
+title = "Farm & Orchard Task Spreadsheet Template"
+description = "A Google Sheets and Excel-ready import template with IDs, groups, urgency, locations, notes, links, subtasks, and update timestamps."
+logical_id = "cc4774a5-05b3-4527-8eb5-f55f1e94920d"
+
+[[outputs]]
+id = "ZrEzPsNrORgoSJ3hTHtfj"
+uri = "file://generated-artifacts/farm-planner-production-backup.json"
+type = "unspecified"
+title = "Farm planner production data backup"
+description = "Downloadable JSON export of production farm tasks, completion history, attachment metadata, team membership, and planner settings. Linked Google Drive files are not bundled."
+logical_id = "6f706f42-e752-4287-9759-545d3a53218a"
+content_hash = "sha256:662dcd5c22165df0219be8373b842078851de4e87875c1b569338db7f69de25d"
+size = 837791
+mtime_ms = 1792161395981
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:88e1b7b8-0079-4105-9fe9-5312d3484061/6f706f42-e752-4287-9759-545d3a53218a/e07fd4b6-b560-4c5e-b8da-bdae4cd35b1e"
+storage_version_token = "1792161398380832"
+content_type = "application/octet-stream"

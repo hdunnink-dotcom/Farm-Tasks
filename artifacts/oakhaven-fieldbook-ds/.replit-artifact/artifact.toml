@@ -1,0 +1,19 @@
+kind = "design-system"
+previewPath = "/oakhaven-fieldbook-ds/"
+title = "Oakhaven Fieldbook Design System"
+description = "A grounded, weather-aware visual system for Oakhaven's farm and orchard fieldbook: calm work surfaces, warm seasonal accents, and high-clarity task planning for people working outdoors."
+version = "1.0.0"
+id = "artifacts/oakhaven-fieldbook-ds"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/oakhaven-fieldbook-ds/" ]
+localPort = 24677
+
+[services.development]
+run = "pnpm --filter @workspace/oakhaven-fieldbook-ds run dev"
+
+[services.env]
+PORT = "24677"
+BASE_PATH = "/oakhaven-fieldbook-ds/"

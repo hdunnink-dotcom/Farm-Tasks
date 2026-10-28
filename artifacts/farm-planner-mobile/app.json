@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Farm & Orchard Planner Mobile",
+    "slug": "farm-planner-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon_2.png",
+    "scheme": "farm-planner-mobile",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon_2.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F3EFE4"
+    },
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {},
+    "web": {
+      "favicon": "./assets/images/icon_2.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Farm Planner to choose field photos for task attachments.",
+          "cameraPermission": "Allow Farm Planner to take field photos for task attachments."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Farm Planner to save a GPS pin for a field task."
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

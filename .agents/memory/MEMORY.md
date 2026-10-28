@@ -1,0 +1,26 @@
+- [Worker access](worker-access.md) — Clerk membership gates API access while Google Sheets remains the backward-compatible task source of truth.
+- [Pnpm root overrides](pnpm-root-overrides.md) — Keep workspace-wide security pins in the root manifest so pnpm records and applies them consistently.
+- [Expo Metro watcher compatibility](expo-metro-watcher-compatibility.md) — Secure Metro pins need matching Expo CLI watcher handling to avoid change-event crashes.
+- [React 19 UI primitive typing](react-19-ui-primitive-typing.md) — Infer Recharts and input-otp props from their public types, not React component internals.
+- [Assistant source provenance](assistant-source-provenance.md) — Keep the owner inbox readable when source metadata evolves by supplying safe defaults for older suggestions.
+- [Claude MCP OAuth](claude-mcp-oauth.md) — Use PKCE and rotating refresh tokens for Claude’s remote connector; never expose a durable bearer token in the UI.
+- [Test authentication overrides](test-authentication-overrides.md) — Verify and remove temporary auth-disable environment flags after browser tests.
+- [Mobile API authentication](mobile-api-authentication.md) — Expo must attach a fresh Clerk bearer token to shared API-client requests; browser cookies do not apply.
+- [Google Sheets task writes](google-sheets-task-writes.md) — Write tasks to explicit A:W rows; Sheets append detection can shift records into a neighboring formatted region.
+- [Client offline cache identity](mobile-offline-cache-identity.md) — Hydrate web/mobile account caches only after Clerk identity is verified, and fail closed during account changes.
+- [Recurring task materialization](weekly-task-materialization.md) — Routines advance by creating one stable Sheet occurrence on completion, never by synthesizing rows during reads.
+- [Local-first task saves](local-first-task-saves.md) — Close task forms after durable local queueing; only attachment-dependent flows need to wait for server sync.
+- [Calendar throttle coordination](calendar-throttle-coordination.md) — Use short-lived shared PostgreSQL advisory leases for cross-instance Google Calendar request throttling.
+- [Clerk ticket acceptance](clerk-ticket-acceptance.md) — Invitation links can fail before farm APIs; use the canonical HTTPS origin, explicit production proxy, and visible ticket recovery.
+- [Invitation redirect origins](invitation-redirect-origins.md) — Clerk invitation redirects must use the canonical public origin behind Replit's path router.
+- [A4 print layout](a4-print-layout.md) — Keep print sheets in normal flow, hide interactive layout, preserve task text, and omit empty groups to prevent blank pages.
+- [Development auth parity](development-auth-parity.md) — Keep client no-auth flags aligned with API auth mode; mismatches cause 401 startup storms that look like slow loading.
+- [Task query coalescing](mobile-task-query-coalescing.md) — Share account-scoped task refreshes with finite freshness so tab navigation does not fan out duplicate requests.
+- [Route smoke testing](route-smoke-testing.md) — jsdom can verify responsive markup, while Radix menus need realistic pointer sequencing.
+- [Manager role compatibility](manager-role-compatibility.md) — New managers use a canonical role while legacy master records remain owner-compatible without destructive migration.
+- [PWA route chunk recovery](pwa-route-chunk-recovery.md) — Never serve the HTML app shell for failed JavaScript or CSS requests; lazy route failures need guarded reload recovery.
+- [OpenAPI count schemas](openapi-count-schemas.md) — Keep generated count fields compatible with this workspace's Zod version.
+- [Radix menu-dialog handoffs](radix-menu-dialog-handoffs.md) — Close modal dropdowns before opening sibling dialogs so focus and accessibility state remain valid.
+- [Browser queue recovery](browser-queue-recovery.md) — Online events do not cover server failures; retry queued mutations by backoff time and on foreground resume without replaying permanent failures.
+- [Cross-tab fieldbook state](cross-tab-fieldbook-state.md) — IndexedDB writes need a browser change signal so account-scoped recovery state rehydrates in sibling planner tabs.
+- [Workspace library declarations](workspace-library-declarations.md) — Refresh ignored workspace declarations before diagnosing missing source exports in artifact typechecks.

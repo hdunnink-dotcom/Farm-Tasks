@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Farm & Orchard Planner"
+description = "A shared farm and orchard task planner for Harnold's orchard and regenerative pasture. It keeps tasks, urgency, locations, notes, subtasks, and completion status synchronized with Google Sheets for reliable use on phone and computer."
+version = "1.0.0"
+id = "artifacts/farm-planner-web"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25491
+
+[services.development]
+run = "pnpm --filter @workspace/farm-planner-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/farm-planner-web", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/farm-planner-web/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25491"
+BASE_PATH = "/"

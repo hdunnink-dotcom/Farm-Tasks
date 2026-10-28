@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.expo
+.git
+.local
+.cache
+.config
+attached_assets
+screenshots
+generated-artifacts
+artifacts/farm-planner-mobile/static-build

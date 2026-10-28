@@ -1,0 +1,1161 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: tasks
+    description: Farm and orchard task operations
+  - name: attachments
+    description: Protected file attachments for farm tasks
+  - name: calendar
+    description: Orchard Managment calendar synchronization
+  - name: assistant
+    description: Supervised Claude task planning assistant
+  - name: daily-plan
+    description: Persistent daily task plan
+  - name: farm-settings
+    description: Harnold-only shared task options
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /tasks:
+    get:
+      operationId: listFarmTasks
+      tags: [tasks]
+      summary: List farm tasks
+      parameters:
+        - in: query
+          name: includeDone
+          schema:
+            type: boolean
+          description: Include completed tasks
+      responses:
+        "200":
+          description: Farm tasks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskList"
+    post:
+      operationId: createFarmTask
+      tags: [tasks]
+      summary: Create a farm task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FarmTask"
+  /tasks/monthly-summary:
+    get:
+      operationId: getFarmMonthlySummary
+      tags: [tasks]
+      summary: Get a calendar-month completion overview
+      parameters:
+        - in: query
+          name: month
+          required: true
+          description: Calendar month in Pacific/Auckland.
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        "200":
+          description: Authorized monthly completion overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonthlyTaskSummary"
+        "400":
+          description: Invalid month
+        "403":
+          description: Completion overview is not available to this account
+        "502":
+          description: Google Sheets completion history could not be read
+  /tasks/{taskId}:
+    patch:
+      operationId: updateFarmTask
+      tags: [tasks]
+      summary: Update a farm task
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdate"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FarmTask"
+        "404":
+          description: Task not found
+    delete:
+      operationId: deleteFarmTask
+      tags: [tasks]
+      summary: Delete a farm task
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Task not found
+  /tasks/summary:
+    get:
+      operationId: getFarmTaskSummary
+      tags: [tasks]
+      summary: Get task summary
+      responses:
+        "200":
+          description: Task summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskSummary"
+  /tasks/pending:
+    get:
+      operationId: listPendingFarmTasks
+      tags: [tasks]
+      summary: List worker tasks awaiting Harnold review
+      responses:
+        "200":
+          description: Pending worker submissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingTaskList"
+  /tasks/{taskId}/approve:
+    post:
+      operationId: approveFarmTask
+      tags: [tasks]
+      summary: Approve a worker task
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskReview" }
+      responses:
+        "200":
+          description: Approved task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FarmTask" }
+  /tasks/{taskId}/reject:
+    post:
+      operationId: rejectFarmTask
+      tags: [tasks]
+      summary: Reject a worker task
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskReview" }
+      responses:
+        "200":
+          description: Rejected task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FarmTask" }
+  /farm-settings:
+    get:
+      operationId: getFarmSettings
+      tags: [farm-settings]
+      summary: Get shared farm task options
+      responses:
+        "200":
+          description: Shared task options
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FarmSettings" }
+    patch:
+      operationId: updateFarmSettings
+      tags: [farm-settings]
+      summary: Update shared farm task options
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FarmSettingsUpdate" }
+      responses:
+        "200":
+          description: Updated shared task options
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FarmSettings" }
+  /daily-plan/today:
+    get:
+      operationId: getTodaysDailyPlan
+      tags: [daily-plan]
+      summary: Get today's persistent daily plan
+      responses:
+        "200":
+          description: Today's plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DailyPlan" }
+  /daily-plan/refresh:
+    post:
+      operationId: refreshDailyPlan
+      tags: [daily-plan]
+      summary: Manually regenerate today's daily plan
+      responses:
+        "200":
+          description: Refreshed plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DailyPlan" }
+  /daily-plan/settings:
+    get:
+      operationId: getDailyPlanSettings
+      tags: [daily-plan]
+      summary: Get daily run settings
+      responses:
+        "200":
+          description: Daily run settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DailyPlanSettings" }
+    patch:
+      operationId: updateDailyPlanSettings
+      tags: [daily-plan]
+      summary: Update daily run settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DailyPlanSettingsUpdate" }
+      responses:
+        "200":
+          description: Updated daily run settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DailyPlanSettings" }
+  /attachments/upload-url:
+    post:
+      operationId: requestFarmAttachmentUpload
+      tags: [attachments]
+      summary: Create a protected attachment upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachmentUploadInput"
+      responses:
+        "201":
+          description: Upload request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentUpload"
+  /attachments/{attachmentId}/complete:
+    post:
+      operationId: completeFarmAttachmentUpload
+      tags: [attachments]
+      summary: Mark a protected attachment upload complete
+      parameters:
+        - in: path
+          name: attachmentId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Attachment ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FarmAttachment"
+  /attachments/{attachmentId}:
+    delete:
+      operationId: deleteFarmAttachment
+      tags: [attachments]
+      summary: Delete an attachment
+      parameters:
+        - in: path
+          name: attachmentId
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Attachment deleted
+  /attachments/{attachmentId}/content:
+    get:
+      operationId: getFarmAttachmentContent
+      tags: [attachments]
+      summary: Stream a protected attachment
+      parameters:
+        - in: path
+          name: attachmentId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Attachment stream
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+  /calendar/orchard/sync:
+    post:
+      operationId: syncOrchardCalendar
+      tags: [calendar]
+      summary: Import all configured farm and agenda calendars into tasks
+      responses:
+        "200":
+          description: Calendar synchronized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarSyncResult"
+    get:
+      operationId: getOrchardCalendarSyncStatus
+      tags: [calendar]
+      summary: Get combined farm and agenda calendar sync status
+      responses:
+        "200":
+          description: Calendar sync status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarSyncStatus"
+  /assistant/proposals:
+    get:
+      operationId: listAssistantProposals
+      tags: [assistant]
+      summary: List Claude task proposals
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, approved, rejected] }
+      responses:
+        "200":
+          description: Task proposals
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AssistantProposal" }
+  /assistant/scan:
+    post:
+      operationId: scanAssistantSources
+      tags: [assistant]
+      summary: Scan Gmail and Calendar for task suggestions
+      responses:
+        "200":
+          description: Scan result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantScanResult" }
+  /assistant/proposals/{proposalId}/approve:
+    post:
+      operationId: approveAssistantProposal
+      tags: [assistant]
+      summary: Approve all tasks in a Claude proposal
+      parameters:
+        - in: path
+          name: proposalId
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssistantApprovalInput" }
+      responses:
+        "200":
+          description: Approved proposal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantProposal" }
+  /assistant/proposals/{proposalId}/reject:
+    post:
+      operationId: rejectAssistantProposal
+      tags: [assistant]
+      summary: Reject a Claude proposal
+      parameters:
+        - in: path
+          name: proposalId
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Rejected proposal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantProposal" }
+  /assistant/proposals/{proposalId}/tasks/{taskId}/approve:
+    post:
+      operationId: approveAssistantProposalTask
+      tags: [assistant]
+      summary: Approve one Claude task suggestion
+      parameters:
+        - in: path
+          name: proposalId
+          required: true
+          schema: { type: number }
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssistantApprovalInput" }
+      responses:
+        "200":
+          description: Approved task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantProposal" }
+  /assistant/proposals/{proposalId}/tasks/{taskId}/reject:
+    post:
+      operationId: rejectAssistantProposalTask
+      tags: [assistant]
+      summary: Reject one Claude task suggestion
+      parameters:
+        - in: path
+          name: proposalId
+          required: true
+          schema: { type: number }
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Updated proposal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantProposal" }
+  /assistant/rules:
+    get:
+      operationId: listAssistantApprovalRules
+      tags: [assistant]
+      summary: List repeat approval rules
+      responses:
+        "200":
+          description: Repeat approval rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AssistantApprovalRule" }
+  /assistant/rules/{ruleId}:
+    patch:
+      operationId: updateAssistantApprovalRule
+      tags: [assistant]
+      summary: Pause or update a repeat approval rule
+      parameters:
+        - in: path
+          name: ruleId
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssistantRuleUpdate" }
+      responses:
+        "200":
+          description: Updated rule
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantApprovalRule" }
+  /assistant/settings:
+    get:
+      operationId: getAssistantSettings
+      tags: [assistant]
+      summary: Get Claude assistant settings
+      responses:
+        "200":
+          description: Assistant settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantSettings" }
+    patch:
+      operationId: updateAssistantSettings
+      tags: [assistant]
+      summary: Update Claude assistant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssistantSettingsUpdate" }
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantSettings" }
+  /assistant/task-request:
+    post:
+      operationId: createAssistantTaskRequest
+      tags: [assistant]
+      summary: Ask Claude to draft one farm task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssistantTaskRequestInput" }
+      responses:
+        "201":
+          description: Pending task proposal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantTaskRequestResponse" }
+  /assistant/connector:
+    post:
+      operationId: createAssistantConnector
+      tags: [assistant]
+      summary: Create an owner-bound Claude custom connector configuration
+      responses:
+        "200":
+          description: Connector configuration
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantConnector" }
+  /assistant/mcp:
+    post:
+      operationId: assistantMcp
+      tags: [assistant]
+      summary: Remote MCP endpoint for the Claude custom connector
+      responses:
+        "200":
+          description: MCP response
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    FarmTask:
+      type: object
+      properties:
+        id:
+          type: string
+        group:
+          $ref: "#/components/schemas/TaskCategory"
+        task:
+          type: string
+        done:
+          type: boolean
+        urgency:
+          type: string
+          enum: [Urgent, High, Medium, Low]
+        month:
+          type: string
+        location:
+          type: string
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        locationCapturedAt:
+          type: string
+          nullable: true
+        atlasLink:
+          type: string
+        notes:
+          type: string
+        link:
+          type: string
+        subtasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskSubtask"
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/FarmAttachment"
+        source:
+          type: string
+          enum: [Manual, Google Calendar]
+        calendarEventId:
+          type: string
+        calendarRecurringEventId:
+          type: string
+        calendarStart:
+          type: string
+        scheduledDates:
+          type: array
+          description: Canonical sorted, unique Pacific/Auckland calendar date keys for one linked task. calendarStart remains the primary (first) date for backwards compatibility.
+          maxItems: 366
+          items:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$'
+        recurrence:
+          $ref: "#/components/schemas/TaskRecurrence"
+        repeatWeekly:
+          type: boolean
+          deprecated: true
+        calendarUpdated:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        assigneeId:
+          type: string
+        assigneeName:
+          type: string
+        assigneeIds:
+          type: array
+          items: { type: string }
+          description: Canonical list of assigned farm member or pending invitation IDs.
+        assigneeNames:
+          type: array
+          items: { type: string }
+          description: Display names corresponding by index to assigneeIds.
+        reviewStatus:
+          type: string
+          enum: [approved, pending, rejected]
+        submittedById:
+          type: string
+        submittedByName:
+          type: string
+        reviewNote:
+          type: string
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, group, task, done, urgency, month, location, notes, link, subtasks, attachments, source, calendarEventId, calendarRecurringEventId, calendarStart, scheduledDates, calendarUpdated, updatedAt, assigneeId, assigneeName]
+    TaskInput:
+      type: object
+      properties:
+        group: { $ref: "#/components/schemas/TaskCategory" }
+        task: { type: string }
+        done: { type: boolean }
+        urgency: { type: string, enum: [Urgent, High, Medium, Low] }
+        month: { type: string }
+        location: { type: string }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        locationCapturedAt: { type: string, nullable: true }
+        atlasLink: { type: string }
+        notes: { type: string }
+        link: { type: string }
+        subtasks:
+          type: array
+          items: { $ref: "#/components/schemas/TaskSubtask" }
+        assigneeId: { type: string }
+        assigneeName: { type: string }
+        assigneeIds:
+          type: array
+          uniqueItems: true
+          maxItems: 100
+          items: { type: string, minLength: 1 }
+        assigneeNames:
+          type: array
+          maxItems: 100
+          items: { type: string }
+        clientTaskId: { type: string }
+        calendarStart: { type: string }
+        scheduledDates:
+          type: array
+          maxItems: 366
+          items:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$'
+        recurrence:
+          $ref: "#/components/schemas/TaskRecurrence"
+        repeatWeekly:
+          type: boolean
+          deprecated: true
+      required: [task]
+    TaskRecurrence:
+      type: string
+      enum: [none, weekly, biweekly, every4weeks, monthly, quarterly, yearly]
+      description: Manual task recurrence interval. Imported calendar tasks must use none.
+    TaskReview:
+      type: object
+      properties:
+        reviewNote: { type: string, maxLength: 500 }
+    FarmSettings:
+      type: object
+      properties:
+        id: { type: number }
+        groups:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1, maxLength: 60 }
+        locations:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 100 }
+        defaultGroup: { type: string }
+        defaultUrgency: { type: string, enum: [Urgent, High, Medium, Low] }
+        defaultLocation: { type: string }
+        updatedAt: { type: string, format: date-time }
+      required: [id, groups, locations, defaultGroup, defaultUrgency, defaultLocation, updatedAt]
+    FarmSettingsUpdate:
+      type: object
+      properties:
+        groups:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { type: string, minLength: 1, maxLength: 60 }
+        locations:
+          type: array
+          maxItems: 200
+          items: { type: string, minLength: 1, maxLength: 100 }
+        defaultGroup: { type: string, minLength: 1, maxLength: 60 }
+        defaultUrgency: { type: string, enum: [Urgent, High, Medium, Low] }
+        defaultLocation: { type: string, maxLength: 100 }
+    PendingTaskList:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/FarmTask" }
+        pendingCount: { type: number }
+      required: [tasks, pendingCount]
+    TaskUpdate:
+      allOf:
+        - $ref: "#/components/schemas/TaskInput"
+        - type: object
+          properties:
+            baseUpdatedAt: { type: string, format: date-time }
+            clientOperationId: { type: string }
+            clientTaskId: { type: string }
+          description: The server version the client edited, used for conflict detection.
+    TaskList:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/FarmTask"
+        source:
+          type: string
+        sourceUrl:
+          type: string
+      required: [tasks, source, sourceUrl]
+    TaskSummary:
+      type: object
+      properties:
+        total: { type: number }
+        open: { type: number }
+        done: { type: number }
+        highPriority: { type: number }
+        dueThisMonth: { type: number }
+        workerProgress:
+          type: array
+          items:
+            type: object
+            properties:
+              workerId: { type: string }
+              workerName: { type: string }
+              total: { type: number }
+              done: { type: number }
+            required: [workerId, workerName, total, done]
+      required: [total, open, done, highPriority, dueThisMonth]
+    CompletionRecord:
+      type: object
+      properties:
+        eventId: { type: string }
+        taskId: { type: string }
+        taskTitle: { type: string }
+        scheduledDate: { type: string }
+        completedAt: { type: string, format: date-time }
+        completedById: { type: string }
+        completedByName: { type: string }
+        group: { type: string }
+        location: { type: string }
+        source: { type: string, enum: [Manual, Google Calendar] }
+        recurrence: { type: string, enum: [none, weekly, biweekly, every4weeks, monthly, quarterly, yearly] }
+        assigneeIds:
+          type: array
+          items: { type: string }
+        assigneeNames:
+          type: array
+          items: { type: string }
+      required: [eventId, taskId, taskTitle, scheduledDate, completedAt, completedById, completedByName, group, location, source, recurrence, assigneeIds, assigneeNames]
+    MonthlyCompletionWorker:
+      type: object
+      properties:
+        workerId: { type: string }
+        workerName: { type: string }
+        completed: { type: number, minimum: 0 }
+      required: [workerId, workerName, completed]
+    MonthlyCompletionBucket:
+      type: object
+      properties:
+        name: { type: string }
+        completed: { type: number, minimum: 0 }
+      required: [name, completed]
+    MonthlyTaskSummary:
+      type: object
+      properties:
+        month: { type: string }
+        scheduled: { type: number, minimum: 0 }
+        completed: { type: number, minimum: 0 }
+        completionRate: { type: number, minimum: 0, maximum: 1 }
+        outstanding: { type: number, minimum: 0 }
+        overdue: { type: number, minimum: 0 }
+        completionDateUnknown: { type: number, minimum: 0 }
+        workers:
+          type: array
+          items: { $ref: "#/components/schemas/MonthlyCompletionWorker" }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/MonthlyCompletionBucket" }
+        locations:
+          type: array
+          items: { $ref: "#/components/schemas/MonthlyCompletionBucket" }
+        completions:
+          type: array
+          items: { $ref: "#/components/schemas/CompletionRecord" }
+      required: [month, scheduled, completed, completionRate, outstanding, overdue, completionDateUnknown, workers, groups, locations, completions]
+    TaskSubtask:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        done: { type: boolean }
+      required: [id, title, done]
+    TaskCategory:
+      type: string
+    DailyPlanItem:
+      type: object
+      properties:
+        taskId: { type: string }
+        title: { type: string }
+        category: { $ref: "#/components/schemas/TaskCategory" }
+        urgency: { type: string, enum: [Urgent, High, Medium, Low] }
+        month: { type: string }
+        reason: { type: string, enum: [overdue, today, current_month] }
+        rank: { type: number }
+      required: [taskId, title, category, urgency, month, reason, rank]
+    DailyPlanGroup:
+      type: object
+      properties:
+        name: { $ref: "#/components/schemas/TaskCategory" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/DailyPlanItem" }
+      required: [name, items]
+    DailyPlan:
+      type: object
+      properties:
+        id: { type: number }
+        planDate: { type: string, format: date }
+        timezone: { type: string }
+        status: { type: string, enum: [generating, ready, error] }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/DailyPlanGroup" }
+        taskCount: { type: number }
+        generatedBy: { type: string, enum: [deterministic, claude] }
+        error: { type: string }
+        startedAt: { type: string, format: date-time }
+        generatedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time }
+      required: [id, planDate, timezone, status, groups, taskCount, generatedBy, error, startedAt, generatedAt, updatedAt]
+    DailyPlanSettings:
+      type: object
+      properties:
+        id: { type: number }
+        enabled: { type: boolean }
+        timezone: { type: string }
+        runAtLocal: { type: string }
+        maxTasks: { type: number }
+        lastRunAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time }
+      required: [id, enabled, timezone, runAtLocal, maxTasks, lastRunAt, updatedAt]
+    DailyPlanSettingsUpdate:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        timezone: { type: string, minLength: 1, maxLength: 80 }
+        runAtLocal: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        maxTasks: { type: number, minimum: 1, maximum: 100 }
+    FarmAttachment:
+      type: object
+      properties:
+        id: { type: string }
+        taskId: { type: string }
+        name: { type: string }
+        contentType: { type: string }
+        size: { type: number }
+        downloadUrl: { type: string }
+      required: [id, taskId, name, contentType, size, downloadUrl]
+    AttachmentUploadInput:
+      type: object
+      properties:
+        taskId: { type: string }
+        name: { type: string, minLength: 1 }
+        size: { type: number, minimum: 1 }
+        contentType: { type: string, minLength: 1 }
+      required: [taskId, name, size, contentType]
+    AttachmentUpload:
+      type: object
+      properties:
+        attachment:
+          $ref: "#/components/schemas/FarmAttachment"
+        uploadUrl:
+          type: string
+      required: [attachment, uploadUrl]
+    CalendarSyncResult:
+      type: object
+      properties:
+        created: { type: number }
+        updated: { type: number }
+        skipped: { type: number }
+        cancelled: { type: number }
+        errors: { type: number }
+        syncedAt: { type: string, format: date-time }
+        calendars:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarSyncSourceResult"
+      required: [created, updated, skipped, cancelled, errors, syncedAt, calendars]
+    CalendarSyncSourceResult:
+      type: object
+      properties:
+        name: { type: string }
+        url: { type: string }
+        state: { type: string, enum: [synced, error] }
+        created: { type: number }
+        updated: { type: number }
+        skipped: { type: number }
+        cancelled: { type: number }
+        errors: { type: number }
+        unsupportedRrules: { type: number }
+        warning: { type: string }
+        error: { type: string }
+      required: [name, state, created, updated, skipped, cancelled, errors]
+    CalendarSourceLink:
+      type: object
+      properties:
+        name: { type: string }
+        url: { type: string }
+        available: { type: boolean }
+        message: { type: string }
+      required: [name, available]
+    CalendarSyncStatus:
+      type: object
+      properties:
+        state: { type: string, enum: [idle, syncing, error] }
+        lastSyncAt: { type: string }
+        lastError: { type: string }
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarSourceLink"
+        result:
+          $ref: "#/components/schemas/CalendarSyncResult"
+      required: [state, lastSyncAt, lastError, sources]
+    AssistantSource:
+      type: object
+      properties:
+        sourceType: { type: string, enum: [gmail, calendar, claude_request] }
+        sourceId: { type: string }
+        title: { type: string }
+        sourceUrl: { type: string }
+        recurringId: { type: string }
+        mailbox: { type: string }
+        originLabel: { type: string }
+        calendarId: { type: string }
+        calendarName: { type: string }
+        originalSender: { type: string }
+        forwardedBy: { type: string }
+      required: [sourceType, sourceId, title, sourceUrl, mailbox, originLabel]
+    AssistantProposalTask:
+      type: object
+      properties:
+        id: { type: number }
+        title: { type: string }
+        rationale: { type: string }
+        dueDate: { type: string, format: date, nullable: true }
+        urgency: { type: string, enum: [Urgent, High, Medium, Low] }
+        groupName: { $ref: "#/components/schemas/TaskCategory" }
+        proposedCategory: { type: string, nullable: true }
+        notes: { type: string }
+        sourceLink: { type: string }
+        sourceType: { type: string }
+        sourceId: { type: string }
+        confidence: { type: number, minimum: 0, maximum: 100 }
+        assumptions:
+          type: array
+          items: { type: string }
+        status: { type: string, enum: [pending, approved, rejected, auto_approved] }
+        approvedTaskId: { type: string, nullable: true }
+        matchedRuleId: { type: number, nullable: true }
+      required: [id, title, rationale, dueDate, urgency, groupName, proposedCategory, notes, sourceLink, sourceType, sourceId, confidence, assumptions, status]
+    AssistantProposal:
+      type: object
+      properties:
+        id: { type: number }
+        title: { type: string }
+        summary: { type: string }
+        status: { type: string, enum: [pending, approved, rejected, partial] }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/AssistantSource" }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/AssistantProposalTask" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        requesterId: { type: string, nullable: true }
+        requesterName: { type: string }
+      required: [id, title, summary, status, sources, tasks, createdAt, updatedAt, requesterName]
+    AssistantApprovalInput:
+      type: object
+      properties:
+        title: { type: string }
+        groupName: { $ref: "#/components/schemas/TaskCategory" }
+        urgency: { type: string, enum: [Urgent, High, Medium, Low] }
+        dueDate: { type: string, format: date, nullable: true }
+        notes: { type: string }
+        createRule: { type: boolean }
+        ruleName: { type: string }
+        ruleType: { type: string, enum: [calendar_series, calendar_event, gmail_sender_subject, gmail_sender] }
+        ruleValue: { type: string }
+        ruleExpiresAt: { type: string, format: date-time, nullable: true }
+      description: Approval edits and an optional narrowly-scoped repeat approval rule.
+    AssistantApprovalRule:
+      type: object
+      properties:
+        id: { type: number }
+        name: { type: string }
+        matchType: { type: string, enum: [calendar_series, calendar_event, gmail_sender_subject, gmail_sender] }
+        matchValue: { type: string }
+        scopeDescription: { type: string }
+        active: { type: boolean }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+      required: [id, name, matchType, matchValue, scopeDescription, active, expiresAt, createdAt]
+    AssistantRuleUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        active: { type: boolean }
+        expiresAt: { type: string, format: date-time, nullable: true }
+    AssistantSettings:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        lookaheadDays: { type: number, minimum: 1, maximum: 180 }
+        playbook: { type: string }
+        lastScanAt: { type: string, format: date-time, nullable: true }
+        lastError: { type: string }
+        sourceScope:
+          type: object
+          properties:
+            mailbox: { type: string }
+            forwardedSenders:
+              type: array
+              items: { type: string }
+            calendars:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                required: [id, name]
+          required: [mailbox, forwardedSenders, calendars]
+      required: [enabled, lookaheadDays, playbook, lastScanAt, lastError, sourceScope]
+    AssistantSettingsUpdate:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        lookaheadDays: { type: number, minimum: 1, maximum: 180 }
+        playbook: { type: string }
+    AssistantTaskRequestInput:
+      type: object
+      properties:
+        request: { type: string, minLength: 3, maxLength: 2000 }
+        whatNeedsDoing: { type: string, minLength: 3, maxLength: 1000 }
+        forWhom: { type: string, minLength: 1, maxLength: 160 }
+        priority: { type: string, enum: [Urgent, High, Medium, Low] }
+        dueDateTime: { type: string, minLength: 1, maxLength: 80 }
+        location: { type: string, maxLength: 160 }
+        duration: { type: string, maxLength: 80 }
+        recurrence: { type: string, enum: [none, weekly, biweekly, every4weeks, monthly, quarterly, yearly] }
+        notes: { type: string, maxLength: 2000 }
+        photoDataUrl: { type: string, maxLength: 7000000, description: Optional image context. Used for drafting only and never persisted. }
+        claudeProjectContext: { type: string, maxLength: 8000 }
+        requestId: { type: string, minLength: 8, maxLength: 120 }
+      required: [request, requestId]
+    AssistantTaskRequestResponse:
+      type: object
+      properties:
+        proposal: { $ref: "#/components/schemas/AssistantProposal" }
+        duplicate: { type: boolean }
+        status: { type: string, enum: [pending_approval] }
+      required: [proposal, duplicate, status]
+    AssistantConnector:
+      type: object
+      properties:
+        endpoint: { type: string }
+        authorizationUrl: { type: string }
+        instructions: { type: string }
+      required: [endpoint, authorizationUrl, instructions]
+    AssistantScanResult:
+      type: object
+      properties:
+        scanned: { type: number }
+        created: { type: number }
+        autoApproved: { type: number }
+        pending: { type: number }
+        skipped: { type: number }
+        error: { type: string }
+      required: [scanned, created, autoApproved, pending, skipped]
+

@@ -1,0 +1,1 @@
+export const AUTH_DISABLED = import.meta.env.VITE_AUTH_DISABLED === "true";

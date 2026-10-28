@@ -1,0 +1,134 @@
+--- a/build/src/start/server/metro/waitForMetroToObserveTypeScriptFile.js
++++ b/build/src/start/server/metro/waitForMetroToObserveTypeScriptFile.js
+@@ -35,21 +35,13 @@
+ function waitForMetroToObserveTypeScriptFile(projectRoot, runner, callback) {
+     const watcher = runner.metro.getBundler().getBundler().getWatcher();
+     const tsconfigPath = _path().default.join(projectRoot, 'tsconfig.json');
+-    const listener = ({ eventsQueue })=>{
+-        for (const event of eventsQueue){
+-            var _event_metadata;
+-            if (event.type === 'add' && ((_event_metadata = event.metadata) == null ? void 0 : _event_metadata.type) !== 'd' && // We need to ignore node_modules because Metro will add all of the files in node_modules to the watcher.
+-            !/node_modules/.test(event.filePath)) {
+-                const { filePath } = event;
+-                // Is TypeScript?
+-                if (// If the user adds a TypeScript file to the observable files in their project.
+-                /\.tsx?$/.test(filePath) || // Or if the user adds a tsconfig.json file to the project root.
+-                filePath === tsconfigPath) {
+-                    debug('Detected TypeScript file added to the project: ', filePath);
+-                    callback();
+-                    off();
+-                    return;
+-                }
++    const listener = ({ changes })=>{
++        for (const [filePath] of changes.addedFiles){
++            if (!/node_modules/.test(filePath) && (/\.tsx?$/.test(filePath) || filePath === tsconfigPath)) {
++                debug('Detected TypeScript file added to the project: ', filePath);
++                callback();
++                off();
++                return;
+             }
+         }
+     };
+@@ -63,19 +55,16 @@
+ }
+ function observeFileChanges(runner, files, callback) {
+     const watcher = runner.metro.getBundler().getBundler().getWatcher();
+-    const listener = ({ eventsQueue })=>{
+-        for (const event of eventsQueue){
+-            var // event.type === 'add' &&
+-            _event_metadata;
+-            if (((_event_metadata = event.metadata) == null ? void 0 : _event_metadata.type) !== 'd' && // We need to ignore node_modules because Metro will add all of the files in node_modules to the watcher.
+-            !/node_modules/.test(event.filePath)) {
+-                const { filePath } = event;
+-                // Is TypeScript?
+-                if (files.includes(filePath)) {
+-                    debug('Observed change:', filePath);
+-                    callback();
+-                    return;
+-                }
++    const watchFilePaths = new Set(files);
++    const listener = ({ changes })=>{
++        for (const [filePath] of [
++            ...changes.addedFiles,
++            ...changes.modifiedFiles
++        ]){
++            if (!/node_modules/.test(filePath) && watchFilePaths.has(filePath)) {
++                debug('Observed change:', filePath);
++                callback();
++                return;
+             }
+         }
+     };
+@@ -89,8 +78,15 @@
+ }
+ function observeAnyFileChanges(runner, callback) {
+     const watcher = runner.metro.getBundler().getBundler().getWatcher();
+-    const listener = ({ eventsQueue })=>{
+-        callback(eventsQueue);
++    const listener = ({ changes })=>{
++        const events = [
++            ...changes.addedFiles,
++            ...changes.modifiedFiles
++        ].map(([filePath, metadata])=>({
++            filePath,
++            metadata
++        }));
++        callback(events);
+     };
+     watcher.addListener('change', listener);
+     const off = ()=>{
+--- a/build/src/start/server/metro/metroWatchTypeScriptFiles.js
++++ b/build/src/start/server/metro/metroWatchTypeScriptFiles.js
+@@ -28,25 +28,36 @@
+ ] }) {
+     const watcher = metro.getBundler().getBundler().getWatcher();
+     const tsconfigPath = _path().default.join(projectRoot, 'tsconfig.json');
+-    const listener = ({ eventsQueue })=>{
+-        for (const event of eventsQueue){
+-            var _event_metadata;
+-            if (eventTypes.includes(event.type) && ((_event_metadata = event.metadata) == null ? void 0 : _event_metadata.type) !== 'd' && // We need to ignore node_modules because Metro will add all of the files in node_modules to the watcher.
+-            !/node_modules/.test(event.filePath) && // Ignore declaration files
+-            !/\.d\.ts$/.test(event.filePath)) {
+-                const { filePath } = event;
+-                // Is TypeScript?
+-                if (// If the user adds a TypeScript file to the observable files in their project.
+-                /\.tsx?$/.test(filePath) || // Or if the user adds a tsconfig.json file to the project root.
+-                tsconfig && filePath === tsconfigPath) {
+-                    debug('Detected TypeScript file changed in the project: ', filePath);
+-                    callback(event);
+-                    if (throttle) {
+-                        return;
+-                    }
++    const isQualifiedChange = ([filePath])=>{
++        if (/node_modules/.test(filePath) || /\.d\.ts$/.test(filePath)) {
++            return false;
++        }
++        return /\.tsx?$/.test(filePath) || tsconfig && filePath === tsconfigPath;
++    };
++    const notify = (changes, type)=>{
++        if (!eventTypes.includes(type)) {
++            return false;
++        }
++        for (const change of changes){
++            if (isQualifiedChange(change)) {
++                const [filePath, metadata] = change;
++                debug('Detected TypeScript file changed in the project: ', filePath);
++                callback({
++                    filePath,
++                    metadata,
++                    type
++                });
++                if (throttle) {
++                    return true;
+                 }
+             }
+         }
++        return false;
++    };
++    const listener = ({ changes })=>{
++        if (notify(changes.addedFiles, 'add')) return;
++        if (notify(changes.modifiedFiles, 'change')) return;
++        notify(changes.removedFiles, 'delete');
+     };
+     debug('Waiting for TypeScript files to be added to the project...');
+     watcher.addListener('change', listener);

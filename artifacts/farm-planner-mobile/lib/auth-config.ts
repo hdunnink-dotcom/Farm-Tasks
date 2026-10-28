@@ -1,0 +1,1 @@
+export const AUTH_DISABLED = process.env.EXPO_PUBLIC_AUTH_DISABLED === 'true';

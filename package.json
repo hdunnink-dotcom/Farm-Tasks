@@ -1,0 +1,46 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+  },
+  "private": true,
+  "dependencies": {
+    "@replit/connectors-sdk": "^0.4.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "19.1.17",
+      "@types/react-dom": "19.1.7",
+      "@expo/metro>metro": "0.83.8",
+      "@expo/metro>metro-babel-transformer": "0.83.8",
+      "@expo/metro>metro-cache": "0.83.8",
+      "@expo/metro>metro-cache-key": "0.83.8",
+      "@expo/metro>metro-config": "0.83.8",
+      "@expo/metro>metro-core": "0.83.8",
+      "@expo/metro>metro-file-map": "0.83.8",
+      "@expo/metro>metro-minify-terser": "0.83.8",
+      "@expo/metro>metro-resolver": "0.83.8",
+      "@expo/metro>metro-runtime": "0.83.8",
+      "@expo/metro>metro-source-map": "0.83.8",
+      "@expo/metro>metro-symbolicate": "0.83.8",
+      "@expo/metro>metro-transform-plugins": "0.83.8",
+      "@expo/metro>metro-transform-worker": "0.83.8",
+      "minimatch@10>brace-expansion": "5.0.9"
+    },
+    "patchedDependencies": {
+      "@expo/cli@54.0.23": "patches/@expo__cli@54.0.27.patch",
+      "@expo/cli@54.0.27": "patches/@expo__cli@54.0.27.patch"
+    }
+  },
+  "devDependencies": {
+    "@neon/config": "^1.9.2",
+    "@neon/env": "^1.6.3",
+    "prettier": "^3.9.6",
+    "typescript": "~5.9.3"
+  }
+}

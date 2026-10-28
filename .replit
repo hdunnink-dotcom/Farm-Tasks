@@ -1,0 +1,37 @@
+modules = ["nodejs-24", "postgresql-16"]
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 90000
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+EXPO_PUBLIC_AUTH_DISABLED = "false"
+
+[userenv.development]
+FARM_MASTER_CLERK_USER_ID = "user_3IKoN5uq9UOkrw53ENgBqaiwqqX"
+
+[userenv.production]
+FARM_MASTER_CLERK_USER_ID = "user_3IKoN5uq9UOkrw53ENgBqaiwqqX"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-33caf9b8-f87b-4e37-b90e-8a6212973cd2"
