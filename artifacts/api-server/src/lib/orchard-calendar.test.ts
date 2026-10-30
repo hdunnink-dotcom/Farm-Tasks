@@ -133,7 +133,7 @@ vi.mock("./google-connectors", () => ({
           sheet.rows.push(...(body.values ?? []));
           sheet.appendCount += body.values?.length ?? 0;
         } else if (decodedPath.includes(":clear")) {
-          const rowMatch = decodedPath.match(/!A(\d+):W\d+:clear/);
+          const rowMatch = decodedPath.match(/!A(\d+):(?:W|AG)\d+:clear/);
           if (rowMatch) {
             sheet.rows.splice(Number(rowMatch[1]) - 2, 1);
             sheet.deleteCount += 1;
@@ -383,6 +383,25 @@ describe("orchard calendar sync", () => {
     }
     expect(cancelledGoogle[11]).toBe("");
     expect(cancelledIcs[11]).toBe("Original calendar description");
+  });
+
+  it("leaves Busy blocks from the free/busy feed out of the task list and removes earlier imports", async () => {
+    const busyEvent = (summary: string) => [
+      "BEGIN:VCALENDAR", "BEGIN:VEVENT", "UID:busy-block", `SUMMARY:${summary}`,
+      `DTSTART:${testDate.replaceAll("-", "")}T090000Z`, "DTSTAMP:20260823T080000Z", "END:VEVENT", "END:VCALENDAR",
+    ].join("\r\n");
+    icsFeed = busyEvent("Hirshberg meeting");
+    const { syncOrchardCalendar } = await import("./orchard-calendar");
+    await syncOrchardCalendar();
+    expect(sheet.rows.some((row) => row[16].includes("busy-block"))).toBe(true);
+
+    icsFeed = busyEvent("Busy");
+    const result = await syncOrchardCalendar();
+    expect(sheet.rows.some((row) => row[16].includes("busy-block"))).toBe(false);
+    expect(result.calendars.find((calendar) => calendar.name === "Hirshberg Institute")).toMatchObject({ created: 0, cancelled: 1 });
+
+    await syncOrchardCalendar();
+    expect(sheet.rows.some((row) => row[16].includes("busy-block"))).toBe(false);
   });
 
   it("reports unsupported ICS RRULE masters as a synced warning while importing expanded instances", async () => {

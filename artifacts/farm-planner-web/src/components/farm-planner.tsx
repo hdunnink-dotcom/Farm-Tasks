@@ -450,7 +450,7 @@ export function TaskCard({ task, onToggle, onEdit, onDelete, onOpen, onToggleSub
           <button type="button" onClick={(event) => { event.stopPropagation(); onEdit(); }} data-testid={`button-edit-task-${task.id}`} className="flex size-11 items-center justify-center rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]" aria-label={`Edit ${task.task}`}><Settings2 size={17} /></button>
           <AlertDialog.Root>
             <AlertDialog.Trigger asChild>
-              <button type="button" aria-label={`Delete ${task.task}`} onClick={(event) => event.stopPropagation()} data-testid={`button-delete-task-${task.id}`} className="flex size-11 items-center justify-center rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-[hsl(5_61%_49%/.1)] hover:text-[hsl(var(--destructive))]"><Trash2 size={17} /></button>
+              <button type="button" aria-label={`Delete ${task.task}`} onClick={(event) => event.stopPropagation()} data-testid={`button-delete-task-${task.id}`} className={`${compact ? 'hidden sm:flex' : 'flex'} size-11 items-center justify-center rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-[hsl(5_61%_49%/.1)] hover:text-[hsl(var(--destructive))]`}><Trash2 size={17} /></button>
             </AlertDialog.Trigger>
             <AlertDialog.Portal>
               <AlertDialog.Overlay className="modal-backdrop fixed inset-0 z-50" />
