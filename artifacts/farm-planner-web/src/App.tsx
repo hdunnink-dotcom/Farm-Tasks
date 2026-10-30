@@ -21,10 +21,10 @@ import {
   isRouteModuleLoadError,
   refreshApp,
 } from '@/lib/route-load-recovery';
-import { AUTH_DISABLED } from '@/lib/auth-config';
+import { AUTH_DISABLED, normalizePublishableKey } from '@/lib/auth-config';
 import { notifyAuthRecovery } from '@/lib/offline-fieldbook';
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const PUBLISHABLE_KEY = normalizePublishableKey(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 const BASE_PATH = import.meta.env.BASE_URL.replace(/\/$/, '');
 const SIGN_IN_PATH = `${BASE_PATH}/sign-in`;
 const SIGN_UP_PATH = `${BASE_PATH}/sign-up`;
