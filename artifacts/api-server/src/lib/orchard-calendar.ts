@@ -1,6 +1,7 @@
 import {
   canonicalScheduledDates,
   createSheetTask,
+  deleteSheetTask,
   listSheetTasks,
   type SheetTask,
   updateSheetTask,
@@ -243,6 +244,11 @@ function eventChanged(existing: SheetTask, next: ReturnType<typeof normalizedEve
     || JSON.stringify(existing.scheduledDates) !== JSON.stringify(next.scheduledDates);
 }
 
+// The public free/busy feed only says "Busy". Those blocks are not farm work.
+function isBusyPlaceholder(source: CalendarSource, event: CalendarEvent): boolean {
+  return source.kind === "ics" && (event.summary ?? "").trim().toLowerCase() === "busy";
+}
+
 const emptyCounts = (): CalendarSyncCounts => ({ created: 0, updated: 0, skipped: 0, cancelled: 0, errors: 0 });
 
 async function syncSource(source: CalendarSource, calendarId: string, tasks: SheetTask[], loaded?: { events: CalendarEvent[]; errors: number }): Promise<CalendarSyncCounts> {
@@ -262,7 +268,14 @@ async function syncSource(source: CalendarSource, calendarId: string, tasks: She
          ?? RETIRED_CALENDAR_IDS_BY_NEW_ID.get(calendarId)
            ?.map((retiredCalendarId) => existingByEventId.get(eventIdentity(retiredCalendarId, event.id!)))
            .find((task): task is SheetTask => Boolean(task));
-      if (!existing) {
+      if (isBusyPlaceholder(source, event)) {
+        if (existing) {
+          await deleteSheetTask(existing.id);
+          counts.cancelled += 1;
+        } else {
+          counts.skipped += 1;
+        }
+      } else if (!existing) {
         await createSheetTask({
           ...next,
           id: source.kind === "ics"
