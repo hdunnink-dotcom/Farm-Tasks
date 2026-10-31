@@ -642,15 +642,24 @@ export function useOfflineFieldbook(
       let current = await readLatestState(scope);
       let authRequiredForRun = false;
       try {
-        const server = await listFarmTasks({ includeDone: true });
-        if (scopeRef.current === scope) {
-          setSource({ name: server.source, url: server.sourceUrl });
+        // A save right after a good sync goes straight to the server: the
+        // server checks baseUpdatedAt, and the list is read once after the
+        // write anyway. This saves a full task-list download per change.
+        const lastRun = syncSnapshots.get(scope);
+        const skipFirstRead = Boolean(lastRun && !lastRun.error && !lastRun.authRequired
+          && Date.now() - lastRun.checkedAt < AUTO_SYNC_FRESH_MS
+          && current.mutations.some((mutation) => mutation.nextAttemptAt <= Date.now()));
+        const server = skipFirstRead ? null : await listFarmTasks({ includeDone: true });
+        if (server) {
+          if (scopeRef.current === scope) {
+            setSource({ name: server.source, url: server.sourceUrl });
+          }
+          current = await updateState(scope, (latest) => ({
+            ...latest,
+            tasks: reconcileTasks(server.tasks, latest),
+            confirmedCreates: reconcileConfirmations(server.tasks, latest),
+          }));
         }
-        current = await updateState(scope, (latest) => ({
-          ...latest,
-          tasks: reconcileTasks(server.tasks, latest),
-          confirmedCreates: reconcileConfirmations(server.tasks, latest),
-        }));
         let changedServer = false;
         const blockedTaskIds = new Set<string>();
         const queuedMutationIds = current.mutations.map((mutation) => mutation.id);
@@ -745,7 +754,7 @@ export function useOfflineFieldbook(
         // A second read is only needed after a write (for example, completing a
         // recurring task can materialize its next occurrence). A read-only
         // startup now uses the first response instead of fetching the list twice.
-        const fresh = changedServer ? await listFarmTasks({ includeDone: true }) : server;
+        const fresh = changedServer || !server ? await listFarmTasks({ includeDone: true }) : server;
         if (scopeRef.current === scope) {
           setSource({ name: fresh.source, url: fresh.sourceUrl });
         }

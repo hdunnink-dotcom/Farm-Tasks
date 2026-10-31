@@ -121,8 +121,7 @@ export default function HomePage() {
       onSuccess: () => {
         trackEvent('assistant_suggestion_reviewed', { outcome: 'approved' });
         invalidateAll();
-        refreshPlan.mutate();
-        setFeedback('Approved suggestion to fieldbook and refreshed today’s plan.');
+        setFeedback('Approved suggestion to fieldbook.');
       },
       onError: () => setFeedback('Failed to approve suggestion.')
     }
@@ -154,6 +153,8 @@ export default function HomePage() {
 
   const changeView = (next: HomeView) => {
     setView(next);
+    // The server rebuilds the plan after every change, so fetch its latest copy.
+    if (next === 'area') void planQuery.refetch();
     try { window.localStorage.setItem(HOME_VIEW_KEY, next); } catch { /* view choice is only a convenience */ }
   };
 
@@ -194,7 +195,6 @@ export default function HomePage() {
       await offline.saveTask(editingTask, draft);
       setDialogOpen(false);
        setFeedback(offline.online ? 'Task updated. Syncing to the fieldbook…' : 'Task updated offline. Pending sync.');
-       if (offline.online && isOwner) void offline.syncNow().then(() => refreshPlan.mutate());
     } else {
       const created = stagedCreatedTask.current ?? await offline.saveTask(undefined, draft);
       stagedCreatedTask.current = created;
@@ -211,7 +211,6 @@ export default function HomePage() {
       stagedCreatedTask.current = null;
       setDialogOpen(false);
        setFeedback(offline.online ? (isOwner ? 'Task added to the board.' : 'Task submitted for Harnold’s review.') : 'Task added offline. Pending sync.');
-       if (offline.online && isOwner) void offline.syncNow().then(() => refreshPlan.mutate());
     }
   };
 
@@ -219,7 +218,6 @@ export default function HomePage() {
     if (!window.confirm(`Remove “${task.task}” from the fieldbook?`)) return;
     void offline.removeTask(task).then(() => {
       setFeedback(offline.online ? 'Task removed.' : 'Task removed offline. Pending sync.');
-      if (offline.online && isOwner) refreshPlan.mutate();
     });
   };
 
@@ -240,7 +238,6 @@ export default function HomePage() {
     const next = order[(order.indexOf(task.urgency) + 1) % order.length];
     void offline.saveTask(task, { task: task.task, urgency: next }).then(() => {
       setFeedback(`Priority changed to ${next}.`);
-      if (offline.online && isOwner) refreshPlan.mutate();
     });
   };
 

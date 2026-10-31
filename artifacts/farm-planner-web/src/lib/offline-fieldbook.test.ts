@@ -278,6 +278,29 @@ describe('useOfflineFieldbook', () => {
     expect(listFarmTasks).toHaveBeenCalledTimes(2);
   });
 
+  it('sends a save straight after a fresh sync and reads the list once afterwards', async () => {
+    const serverTask = task({ updatedAt: '2026-08-20T10:00:00.000Z' });
+    const savedTask = task({ urgency: 'High', updatedAt: '2026-08-20T10:05:00.000Z' });
+    listFarmTasks.mockResolvedValue({ tasks: [serverTask], source: 'Google Sheets' });
+    setOnline(true);
+    const result = await loadHook();
+    await waitFor(() => expect(result.result.current.serverChecked).toBe(true));
+    await waitFor(() => expect(result.result.current.syncing).toBe(false));
+    expect(listFarmTasks).toHaveBeenCalledTimes(1);
+
+    listFarmTasks.mockResolvedValue({ tasks: [savedTask], source: 'Google Sheets' });
+    updateFarmTask.mockResolvedValue(savedTask);
+    await result.result.current.saveTask(result.result.current.tasks[0], { task: serverTask.task, urgency: 'High' });
+
+    await waitFor(() => expect(result.result.current.pendingCount).toBe(0));
+    await waitFor(() => expect(result.result.current.syncing).toBe(false));
+    expect(updateFarmTask).toHaveBeenCalledTimes(1);
+    expect(updateFarmTask.mock.calls[0][1]).toEqual(expect.objectContaining({ baseUpdatedAt: serverTask.updatedAt }));
+    expect(listFarmTasks).toHaveBeenCalledTimes(2);
+    expect(updateFarmTask.mock.invocationCallOrder[0]).toBeLessThan(listFarmTasks.mock.invocationCallOrder[1]);
+    expect(result.result.current.tasks[0]).toEqual(expect.objectContaining({ urgency: 'High', updatedAt: savedTask.updatedAt }));
+  });
+
   it('keeps a temporary failure queued with an attempt and retry time', async () => {
     const result = await loadHook();
     await result.result.current.saveTask(undefined, { task: 'Check frost cloth' });
