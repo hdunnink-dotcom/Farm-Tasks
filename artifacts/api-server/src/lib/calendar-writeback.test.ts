@@ -34,3 +34,22 @@ describe("calendar write-back", () => {
       .toEqual({ start: { dateTime: "2026-10-24T08:30:00", timeZone: "Pacific/Auckland" }, end: { dateTime: "2026-10-24T09:30:00", timeZone: "Pacific/Auckland" } });
   });
 });
+
+describe("clearing the date of a calendar task", () => {
+  it("drops a cleared date so the rest of the edit still saves", async () => {
+    const { withoutClearedCalendarDate } = await import("./calendar-writeback");
+    expect(withoutClearedCalendarDate({ task: "CITRUS ground", done: true, calendarStart: "", scheduledDates: [] }))
+      .toEqual({ task: "CITRUS ground", done: true });
+    expect(withoutClearedCalendarDate({ task: "Orchard pruning", calendarStart: "" })).toEqual({ task: "Orchard pruning" });
+  });
+
+  it("keeps a real date or an edit without dates as sent", async () => {
+    const { withoutClearedCalendarDate } = await import("./calendar-writeback");
+    const move = { task: "CITRUS foliar", calendarStart: "2026-11-03", scheduledDates: ["2026-11-03"] };
+    expect(withoutClearedCalendarDate(move)).toBe(move);
+    const fromDays = { task: "CITRUS foliar", calendarStart: "", scheduledDates: ["2026-11-04"] };
+    expect(withoutClearedCalendarDate(fromDays)).toBe(fromDays);
+    const doneOnly: { task: string; done: boolean; calendarStart?: string } = { task: "CITRUS foliar", done: true };
+    expect(withoutClearedCalendarDate(doneOnly)).toBe(doneOnly);
+  });
+});

@@ -113,6 +113,18 @@ function aucklandInstantMs(date: string, time: string): number {
   return instant;
 }
 
+/**
+ * A calendar event always has a date. An edit that clears the date of a
+ * calendar-imported task keeps the event's date and saves the rest of the
+ * edit (done, notes, priority) instead of refusing all of it.
+ */
+export function withoutClearedCalendarDate<T extends { calendarStart?: string; scheduledDates?: string[] }>(input: T): T {
+  const setsDate = Boolean(input.calendarStart?.trim()) || Boolean(input.scheduledDates?.length);
+  if (setsDate || (input.calendarStart === undefined && input.scheduledDates === undefined)) return input;
+  const { calendarStart: _clearedStart, scheduledDates: _clearedDays, ...rest } = input;
+  return rest as T;
+}
+
 export type CalendarChange = {
   /** New calendarStart (date key or ISO instant), when the task moved. */
   start?: string;

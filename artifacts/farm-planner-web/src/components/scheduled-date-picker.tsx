@@ -13,6 +13,8 @@ import {
 type ScheduledDatePickerProps = {
   value: string;
   onChange: (value: string) => void;
+  /** Calendar-imported tasks always keep a date, so they cannot be cleared. */
+  requireDate?: boolean;
 };
 
 function localTime(value: string): string {
@@ -22,7 +24,7 @@ function localTime(value: string): string {
   return formatAucklandDateTimeInput(value).slice(11, 16);
 }
 
-export function ScheduledDatePicker({ value, onChange }: ScheduledDatePickerProps) {
+export function ScheduledDatePicker({ value, onChange, requireDate = false }: ScheduledDatePickerProps) {
   const initialDate = calendarStartDayKey(value) ?? localAucklandDateKey();
   const [selectedDate, setSelectedDate] = useState(calendarStartDayKey(value) ?? '');
   const [time, setTime] = useState(localTime(value));
@@ -93,9 +95,11 @@ export function ScheduledDatePicker({ value, onChange }: ScheduledDatePickerProp
           Time in Auckland
           <input type="time" value={time} onChange={(event) => changeTime(event.target.value)} data-testid="input-task-calendar-time" className="field-input mt-1.5 w-full" />
         </label>
-        {hasSchedule && <button type="button" onClick={clear} data-testid="button-clear-task-calendar" className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-[hsl(var(--border))] px-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><X size={14} /> Clear</button>}
+        {hasSchedule && !requireDate && <button type="button" onClick={clear} data-testid="button-clear-task-calendar" className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-[hsl(var(--border))] px-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><X size={14} /> Clear</button>}
       </div>
-      <p className="mt-2 text-[11px] leading-4 text-[hsl(var(--muted-foreground))]">Choose a date and optional time. Leave it clear for unscheduled work.</p>
+      <p className="mt-2 text-[11px] leading-4 text-[hsl(var(--muted-foreground))]">{requireDate
+        ? 'This task comes from Google Calendar, so it always keeps a date. Pick a new day to move it, or mark it done.'
+        : 'Choose a date and optional time. Leave it clear for unscheduled work.'}</p>
     </div>
   );
 }

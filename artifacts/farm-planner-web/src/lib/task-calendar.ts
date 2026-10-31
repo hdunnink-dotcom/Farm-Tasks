@@ -10,11 +10,13 @@ const aucklandTimeFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: AUCKLAND_TIME_ZONE, hour: 'numeric', minute: '2-digit',
 });
 
+const aucklandPartsFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: AUCKLAND_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+
 function dateTimeParts(date: Date): Record<string, string> {
-  return Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
-    timeZone: AUCKLAND_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-  }).formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  return Object.fromEntries(aucklandPartsFormatter.formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
 }
 
 /** Formats an instant for a datetime-local control in the farm's timezone. */
@@ -54,13 +56,17 @@ export function isValidTaskSchedule(value: string): boolean {
   return normalizeTaskSchedule(value) !== null;
 }
 
+// Building a formatter is far slower than using one, and sorting a few
+// hundred tasks asks for thousands of day keys, so keep one per time zone.
+const dayKeyFormatters = new Map<string, Intl.DateTimeFormat>();
+
 function dateKeyFromParts(date: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
+  let formatter = dayKeyFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    dayKeyFormatters.set(timeZone, formatter);
+  }
+  const parts = formatter.formatToParts(date);
   const part = (type: string) => parts.find((item) => item.type === type)?.value;
   return `${part('year')}-${part('month')}-${part('day')}`;
 }

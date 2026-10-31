@@ -228,8 +228,8 @@ describe('All Tasks search', () => {
     updatedAt: '2026-08-30T00:00:00.000Z',
     assigneeId: '',
     assigneeName: '',
-    assigneeIds: [],
-    assigneeNames: [],
+    assigneeIds: [] as string[],
+    assigneeNames: [] as string[],
   });
 
   function renderReadyTasks(taskRows = [
@@ -265,6 +265,21 @@ describe('All Tasks search', () => {
 
     expect(screen.queryByTestId('task-card-task-a')).toBeNull();
     expect(screen.getByTestId('task-card-task-b').textContent).toContain('Prepare audit papers');
+  });
+
+  it('shows only work nobody has been given when Unassigned is chosen', async () => {
+    renderReadyTasks([
+      task('task-a', 'Prune pear row', 'North orchard', ''),
+      { ...task('task-b', 'Cut broom in paddock 75', 'Gully 2', ''), assigneeId: 'worker-j', assigneeName: 'Jason', assigneeIds: ['worker-j'], assigneeNames: ['Jason'] },
+    ]);
+    await screen.findByTestId('task-card-task-b');
+
+    const select = screen.getByTestId('select-filter-assignee') as HTMLSelectElement;
+    expect(Array.from(select.options, (option) => option.textContent)).toEqual(['All assignees', 'Unassigned', 'Jason']);
+    fireEvent.change(select, { target: { value: '__unassigned__' } });
+
+    expect(screen.getByTestId('task-card-task-a').textContent).toContain('Prune pear row');
+    expect(screen.queryByTestId('task-card-task-b')).toBeNull();
   });
 
   it('keeps task filter options in the configured Farm Defaults order', async () => {

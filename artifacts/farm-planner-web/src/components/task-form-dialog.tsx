@@ -334,7 +334,7 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
                     };
                   });
                   setCalendarError('');
-                }} />
+                }} requireDate={task?.source === 'Google Calendar'} />
                <div className="mt-3 border-t border-[hsl(var(--border))] pt-3">
                  <p className="text-xs font-semibold text-[hsl(var(--foreground))]">Add linked days</p>
                  <p className="mt-1 text-[11px] leading-4 text-[hsl(var(--muted-foreground))]">One task can appear on several days and shares its completion state.</p>

@@ -19,6 +19,16 @@ describe('ScheduledDatePicker', () => {
     expect(onChange).toHaveBeenLastCalledWith('2026-05-04T21:30:00.000Z');
   });
 
+  it('offers no Clear for a date that must stay, such as a Google Calendar task', () => {
+    const onChange = vi.fn();
+    render(<ScheduledDatePicker value="2026-09-05" onChange={onChange} requireDate />);
+
+    expect(screen.queryByTestId('button-clear-task-calendar')).toBeNull();
+    expect(screen.getByTestId('task-schedule-picker').textContent).toContain('always keeps a date');
+    fireEvent.click(screen.getByTestId('calendar-date-2026-09-12'));
+    expect(onChange).toHaveBeenLastCalledWith('2026-09-12');
+  });
+
   it('clears a schedule and keeps date-only values without inventing a time', () => {
     const onChange = vi.fn();
     const { rerender } = render(<ScheduledDatePicker value="2026-08-30" onChange={onChange} />);

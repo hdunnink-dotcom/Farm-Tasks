@@ -1,5 +1,6 @@
 import path from "node:path";
 import express, { type Express } from "express";
+import compression from "compression";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -34,6 +35,10 @@ app.use(
   }),
 );
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+// Gzip JSON and the web app. The task list is large and phones in the field
+// are often on a weak signal. Placed after the Clerk proxy, which streams
+// already-encoded responses.
+app.use(compression());
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
