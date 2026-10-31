@@ -25,7 +25,7 @@ import {
   type TaskRecurrence,
 } from "../lib/farm-sheet";
 import type { SheetTask } from "../lib/farm-sheet";
-import { CalendarWritebackError, writeBackToCalendar, type CalendarChange } from "../lib/calendar-writeback";
+import { CalendarWritebackError, withoutClearedCalendarDate, writeBackToCalendar, type CalendarChange } from "../lib/calendar-writeback";
 import { listReadyAttachments } from "../lib/farm-attachments";
 import { currentMember, isMaster, requireMember } from "../lib/farm-access";
 import { normalizeSheetTaskInput } from "../lib/task-input-normalization";
@@ -475,7 +475,9 @@ router.patch("/tasks/:taskId", async (req, res): Promise<void> => {
       res.status(400).json({ error: "Imported calendar tasks cannot be made into manual recurrence routines." });
       return;
     }
-    const sheetInput = normalizeSheetTaskInput(body.data);
+    const sheetInput = existing.source === "Google Calendar"
+      ? withoutClearedCalendarDate(normalizeSheetTaskInput(body.data))
+      : normalizeSheetTaskInput(body.data);
     const assignments = isMaster(member) ? await authorizedAssignments(body.data) : undefined;
     if (assignments === null) {
       res.status(400).json({ error: "Every assignee must be a current or invited farm team member." });
