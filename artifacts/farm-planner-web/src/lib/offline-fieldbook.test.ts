@@ -278,6 +278,21 @@ describe('useOfflineFieldbook', () => {
     expect(listFarmTasks).toHaveBeenCalledTimes(2);
   });
 
+  it('shows a ticked task straight away, before it is stored', async () => {
+    const result = await loadHook();
+    await result.result.current.saveTask(undefined, { task: 'Check the gate' });
+    await waitFor(() => expect(result.result.current.tasks).toHaveLength(1));
+    const current = result.result.current.tasks[0];
+
+    let saving!: Promise<unknown>;
+    act(() => { saving = result.result.current.saveTask(current, { task: current.task, done: true }); });
+    expect(result.result.current.tasks[0].done).toBe(true);
+
+    await act(async () => { await saving; });
+    expect(result.result.current.tasks[0].done).toBe(true);
+    expect(storedState().tasks[0].done).toBe(true);
+  });
+
   it('sends a save straight after a fresh sync and reads the list once afterwards', async () => {
     const serverTask = task({ updatedAt: '2026-08-20T10:00:00.000Z' });
     const savedTask = task({ urgency: 'High', updatedAt: '2026-08-20T10:05:00.000Z' });

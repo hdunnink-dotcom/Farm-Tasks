@@ -558,7 +558,12 @@ export function useOfflineFieldbook(
   const wasAuthReadyRef = useRef(false);
   const hydrationRecoveryRef = useRef<string | null>(null);
   const recoveryGenerationRef = useRef(0);
+  const stateRef = useRef(state);
+  // Bumped by every local change that is shown before it is stored, so a
+  // slower read that started earlier cannot paint the old version back.
+  const localChangeRef = useRef(0);
   scopeRef.current = scope;
+  stateRef.current = state;
 
   const refreshState = useCallback(async () => {
     if (!hasVerifiedScope) {
@@ -567,8 +572,12 @@ export function useOfflineFieldbook(
       setHydratedScope(null);
       return;
     }
+    const localChange = localChangeRef.current;
     const next = await readLatestState(scope);
     if (scopeRef.current !== scope) return;
+    // A newer local change is already on screen; its own refresh follows.
+    if (localChange !== localChangeRef.current) return;
+    stateRef.current = next;
     setState(next);
     setHydrated(true);
     setHydratedScope(scope);
@@ -1001,6 +1010,16 @@ export function useOfflineFieldbook(
     if (online) void sync();
   }, [hasVerifiedScope, online, refreshState, scope, sync]);
 
+  // Puts a change on screen in the same frame as the click. Storing it in
+  // the browser and sending it to the server follow in the background.
+  const showLocally = useCallback((updateTasks: (tasks: FarmTask[]) => FarmTask[]) => {
+    localChangeRef.current += 1;
+    const next = { ...stateRef.current, tasks: updateTasks(stateRef.current.tasks) };
+    stateRef.current = next;
+    setState(next);
+    queryClient.setQueryData(queryKey, { tasks: next.tasks.filter((task) => includeDone || !task.done), source: 'Local fieldbook' });
+  }, [includeDone, queryClient, queryKey]);
+
   const saveTask = useCallback(async (task: FarmTask | undefined, data: TaskInput) => {
     if (!hasVerifiedScope) throw new Error('Account identity has not been verified.');
     data = normalizeAssignmentInput(normalizeQueuedTaskInput(data).data ?? data);
@@ -1008,6 +1027,7 @@ export function useOfflineFieldbook(
     const syncState = online ? 'online' : 'offline';
     if (task) {
       const next = { ...task, ...data, updatedAt: new Date().toISOString() };
+      showLocally((tasks) => tasks.map((item) => item.id === task.id ? next : item));
       await updateState(scope, (current) => ({
         ...current,
         tasks: current.tasks.map((item) => item.id === task.id ? next : item),
@@ -1040,10 +1060,11 @@ export function useOfflineFieldbook(
       has_recurrence: Boolean(data.recurrence || data.repeatWeekly),
     });
     return next;
-  }, [hasVerifiedScope, online, refreshState, scope, sync]);
+  }, [hasVerifiedScope, online, refreshState, scope, showLocally, sync]);
 
   const removeTask = useCallback(async (task: FarmTask) => {
     if (!hasVerifiedScope) throw new Error('Account identity has not been verified.');
+    showLocally((tasks) => tasks.filter((item) => item.id !== task.id));
     await updateState(scope, (current) => ({
       ...current,
       tasks: current.tasks.filter((item) => item.id !== task.id),
@@ -1052,7 +1073,7 @@ export function useOfflineFieldbook(
     await refreshState();
     if (online) void sync();
     trackEvent('task_deleted', { sync_state: online ? 'online' : 'offline' });
-  }, [hasVerifiedScope, online, refreshState, scope, sync]);
+  }, [hasVerifiedScope, online, refreshState, scope, showLocally, sync]);
 
   const ensureTaskSynced = useCallback(async (taskId: string) => {
     if (!hasVerifiedScope) throw new Error('Account identity has not been verified.');
