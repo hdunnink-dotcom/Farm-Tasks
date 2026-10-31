@@ -38,6 +38,9 @@ export function resolveEditTaskHandoff<T extends { id: string }>(
   return tasks.find((task) => task.id === editId) ?? null;
 }
 
+// Filter value for work nobody has been given yet. Not a possible team name.
+const UNASSIGNED = '__unassigned__';
+
 export default function TasksPage() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const clerk = useClerk();
@@ -106,7 +109,7 @@ export default function TasksPage() {
     return ['All locations', ...orderedLocations];
   }, [farmSettingsQuery.data?.locations, tasks]);
   const sources = useMemo(() => ['All sources', ...Array.from(new Set(tasks.map(t => t.source).filter(Boolean))).sort()], [tasks]);
-  const assignees = useMemo(() => ['All assignees', ...Array.from(new Set(tasks.flatMap((task) => task.assigneeNames?.length ? task.assigneeNames : task.assigneeName ? [task.assigneeName] : []))).sort()], [tasks]);
+  const assignees = useMemo(() => ['All assignees', UNASSIGNED, ...Array.from(new Set(tasks.flatMap((task) => task.assigneeNames?.length ? task.assigneeNames : task.assigneeName ? [task.assigneeName] : []))).sort()], [tasks]);
   const availableMonths = monthOptions(tasks);
   const taskViewPreferences = useMemo<TaskViewPreferences>(() => ({
     search,
@@ -231,7 +234,8 @@ export default function TasksPage() {
            ? taskMatchesLocalWeek(task, weekStart)
            : taskIsUnscheduled(task);
       const taskAssignees = task.assigneeNames?.length ? task.assigneeNames : task.assigneeName ? [task.assigneeName] : [];
-      const matchesAssignee = assigneeFilter === 'All' || taskAssignees.includes(assigneeFilter);
+      const matchesAssignee = assigneeFilter === 'All'
+        || (assigneeFilter === UNASSIGNED ? !taskAssignees.length && !task.assigneeIds?.length && !task.assigneeId : taskAssignees.includes(assigneeFilter));
       const matchesLocation = locationFilter === 'All' || task.location === locationFilter || (locationFilter === 'All locations' && true);
       const matchesSource = sourceFilter === 'All' || task.source === sourceFilter || (sourceFilter === 'All sources' && true);
       const matchesOverdue = !overdueFilter || isTaskOverdue(task);
@@ -410,7 +414,7 @@ export default function TasksPage() {
                <label className="relative"><Filter size={14} aria-hidden="true" className="pointer-events-none absolute right-8 top-3 text-[hsl(var(--muted-foreground))]" /><select value={urgency} onChange={(event) => setUrgency(event.target.value as typeof urgency)} data-testid="select-filter-urgency" style={{ paddingRight: '3.5rem' }} className="field-input min-w-[128px] pr-14"><option value="All">All priority</option><option value="Urgent">Urgent</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select></label>
               <label className="relative"><select value={monthFilter} onChange={(event) => { const value = event.target.value; setMonthFilter(value); setCalendarScope(value === 'unscheduled' ? 'unscheduled' : 'month'); }} data-testid="select-filter-month" className="field-input min-w-[140px] pr-8"><option value="all">All months</option><option value={CURRENT_MONTH}>Current month</option><option value="unscheduled">Unscheduled</option>{availableMonths.map((month) => <option key={month} value={month}>{monthLabel(month)}</option>)}</select></label>
               <label className="relative"><select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} data-testid="select-filter-location" className="field-input min-w-[140px] pr-8">{locations.map(loc => <option key={loc} value={loc === 'All locations' ? 'All' : loc}>{loc}</option>)}</select></label>
-              <label className="relative"><select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} data-testid="select-filter-assignee" className="field-input min-w-[140px] pr-8">{assignees.map(a => <option key={a} value={a === 'All assignees' ? 'All' : a}>{a}</option>)}</select></label>
+              <label className="relative"><select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} data-testid="select-filter-assignee" className="field-input min-w-[140px] pr-8">{assignees.map(a => <option key={a} value={a === 'All assignees' ? 'All' : a}>{a === UNASSIGNED ? 'Unassigned' : a}</option>)}</select></label>
               <label className="relative"><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} data-testid="select-filter-source" className="field-input min-w-[140px] pr-8">{sources.map(s => <option key={s} value={s === 'All sources' ? 'All' : s}>{s}</option>)}</select></label>
               <label className="relative"><select value={sort} onChange={(event) => setSort(event.target.value as TaskSort)} data-testid="select-sort-tasks" className="field-input min-w-[150px] pr-8"><option value="priority">Priority</option><option value="date">Date</option><option value="title">Title</option><option value="updated">Recently updated</option></select></label>
             </div>
