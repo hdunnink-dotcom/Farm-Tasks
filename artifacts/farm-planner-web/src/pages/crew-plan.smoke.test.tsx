@@ -94,6 +94,22 @@ vi.mock('@/components/farm-planner', () => ({
   UrgencyPill: ({ urgency }: { urgency: string }) => <span data-testid={`status-urgency-${urgency.toLowerCase()}`}>{urgency}</span>,
 }));
 
+vi.mock('@/components/crew-task-editor', () => ({
+  CrewTaskEditor: ({ task, initialDraft, saveTask, onDone, onClose }: {
+    task?: FarmTask;
+    initialDraft?: { task: string };
+    saveTask: (task: FarmTask | undefined, data: { task: string }) => Promise<unknown>;
+    onDone: () => void;
+    onClose: () => void;
+  }) => (
+    <div role="dialog" aria-label="Full task editor">
+      <p>{task?.task ?? initialDraft?.task}</p>
+      <button type="button" onClick={() => void saveTask(task, { task: `${task?.task ?? initialDraft?.task} (edited)` }).then(onDone)}>Save full task</button>
+      <button type="button" onClick={onClose}>Close full task</button>
+    </div>
+  ),
+}));
+
 import CrewPlanPage, { shiftDateKey } from './crew-plan';
 
 const task = (input: Partial<FarmTask>): FarmTask => ({
@@ -260,7 +276,7 @@ describe('authenticated /crew-plan browser smoke path', () => {
     expect(screen.getAllByText('Tom').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Jason').length).toBeGreaterThan(0);
     expect(screen.getByText('Unassigned/Open work')).toBeTruthy();
-    expect(within(board).getByTestId('status-urgency-urgent')).toBeTruthy();
+    expect(within(board).getByTestId('select-urgency-urgent')).toBeTruthy();
     expect(within(board).getByTestId('board-task-unassigned-task')).toBeTruthy();
     expect(within(board).getByTestId('board-task-completed-manager-task')).toBeTruthy();
     expect(screen.getByTestId('crew-task-list-item-overdue-task')).toBeTruthy();
@@ -338,7 +354,16 @@ describe('authenticated /crew-plan browser smoke path', () => {
 
     openTaskOptions('Edit orchard notes');
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit full details' }));
-    expect(state.setLocation).toHaveBeenCalledWith('/tasks?edit=edit-task');
+    // The full editor opens over the board; saving returns to the Crew plan.
+    const editor = await screen.findByRole('dialog', { name: 'Full task editor' });
+    expect(editor.textContent).toContain('Edit orchard notes');
+    fireEvent.click(within(editor).getByRole('button', { name: 'Save full task' }));
+    await waitFor(() => expect(state.saveTask).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'edit-task' }),
+      { task: 'Edit orchard notes (edited)' },
+    ));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Full task editor' })).toBeNull());
+    expect(state.setLocation).not.toHaveBeenCalled();
 
     openTaskOptions('Check water troughs');
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Mark complete' }));

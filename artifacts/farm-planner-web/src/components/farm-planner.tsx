@@ -35,6 +35,7 @@ import { googleMapsUrl, hasTaskCoordinates, isSafeExternalUrl } from '@/lib/task
 import { formatTaskScheduledDates } from '@/lib/task-calendar';
 import { formatCoordinatePair } from '@/lib/coordinates';
 import { goToStartPage, refreshApp } from '@/lib/route-load-recovery';
+import { urgencyStyles } from './urgency-select';
 
 export function FieldMark({ compact = false }: { compact?: boolean }) {
   return (
@@ -243,13 +244,7 @@ export function SourcePill({ source }: { source?: string }) {
 }
 
 export function UrgencyPill({ urgency, onCycle }: { urgency: 'Urgent' | 'Low' | 'Medium' | 'High'; onCycle?: () => void }) {
-  const styles = {
-    Urgent: 'bg-[hsl(0_72%_48%/.15)] text-[hsl(0_65%_38%)] border-[hsl(0_65%_48%/.3)]',
-    High: 'bg-[hsl(5_61%_49%/.11)] text-[hsl(5_61%_42%)] border-[hsl(5_61%_49%/.22)]',
-    Medium: 'bg-[hsl(35_82%_66%/.2)] text-[hsl(26_55%_35%)] border-[hsl(35_62%_56%/.3)]',
-    Low: 'bg-[hsl(156_28%_28%/.09)] text-[hsl(156_28%_28%)] border-[hsl(156_28%_28%/.18)]',
-  };
-  const className = `inline-flex rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[.12em] ${styles[urgency]}`;
+  const className = `inline-flex rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[.12em] ${urgencyStyles[urgency]}`;
   return onCycle ? (
     <button type="button" onClick={onCycle} className={`${className} cursor-pointer transition-transform hover:-translate-y-0.5`} aria-label={`Priority ${urgency}. Click to change priority.`} data-testid={`button-cycle-priority-${urgency.toLowerCase()}`}>{urgency}</button>
   ) : <span className={className} data-testid={`status-urgency-${urgency.toLowerCase()}`}>{urgency}</span>;

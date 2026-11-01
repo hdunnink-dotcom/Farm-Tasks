@@ -189,6 +189,40 @@ describe('Crew Plan Utilities', () => {
     });
   });
 
+  describe('changing urgency', () => {
+    function openUrgency(label: string) {
+      const trigger = screen.getByRole('button', { name: label });
+      fireEvent.pointerDown(trigger, { button: 0 });
+      fireEvent.click(trigger);
+    }
+
+    it('changes a board card urgency from the dropdown without opening the editor', async () => {
+      const saveTask = vi.fn().mockResolvedValue(task({ id: 'urgent-result', urgency: 'High' }));
+      const onEdit = vi.fn();
+      render(<BoardTask workers={[]} saveTask={saveTask} onEdit={onEdit} visibleDates={['2026-11-02']} task={task({ id: 'spray', task: 'Spray apples', urgency: 'Medium' })} />);
+
+      openUrgency('Urgency Medium for Spray apples. Change urgency.');
+      fireEvent.click(await waitFor(() => screen.getByRole('menuitem', { name: 'High' })));
+
+      await waitFor(() => expect(saveTask).toHaveBeenCalledWith(expect.objectContaining({ id: 'spray' }), { task: 'Spray apples', urgency: 'High' }));
+      expect(onEdit).not.toHaveBeenCalled();
+    });
+
+    it('changes urgency in the side list while a click on the task still opens it', async () => {
+      const onEdit = vi.fn();
+      const onChangeUrgency = vi.fn();
+      render(<CrewTaskSidebar tasks={[task({ id: 'broom', task: 'Cut broom', urgency: 'Low' })]} onEdit={onEdit} onChangeUrgency={onChangeUrgency} />);
+
+      openUrgency('Urgency Low for Cut broom. Change urgency.');
+      fireEvent.click(await waitFor(() => screen.getByRole('menuitem', { name: 'Urgent' })));
+      expect(onChangeUrgency).toHaveBeenCalledWith(expect.objectContaining({ id: 'broom' }), 'Urgent');
+      expect(onEdit).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId('crew-task-list-item-broom'));
+      expect(onEdit).toHaveBeenCalledWith('broom');
+    });
+  });
+
   describe('BoardTask completion', () => {
     const completionProps = {
       workers: [],
