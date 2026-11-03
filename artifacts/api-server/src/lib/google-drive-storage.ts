@@ -1,4 +1,4 @@
-import { GoogleConnectors } from "./google-connectors";
+import { GoogleConnectors, googleAccessToken } from "./google-connectors";
 
 const DRIVE_FOLDER_NAME = "Farm Planner Attachments";
 const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder";
@@ -74,6 +74,34 @@ export async function uploadDriveAttachment(input: {
 export async function downloadDriveAttachment(fileId: string): Promise<Response> {
   const response = await driveRequest(`/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, { method: "GET" });
   if (!response.ok) throw new Error(`Google Drive download failed (${response.status}).`);
+  return response;
+}
+
+/** Drive's thumbnail link resized to `longEdge` pixels, or null when it is not a Google image host. */
+export function sizedThumbnailUrl(thumbnailLink: string, longEdge: number): string | null {
+  let url: URL;
+  try {
+    url = new URL(thumbnailLink);
+  } catch {
+    return null;
+  }
+  // The access token is sent with this request, so only ever to Google's image host.
+  if (url.protocol !== "https:" || !url.hostname.endsWith(".googleusercontent.com")) return null;
+  return `${thumbnailLink.replace(/=s\d+(?:-[a-z0-9-]*)?$/i, "")}=s${longEdge}`;
+}
+
+/**
+ * A resized copy of a Drive image, made from Drive's own thumbnail. Returns
+ * null when Drive has no thumbnail (yet), so the caller can send the original.
+ */
+export async function downloadDriveThumbnail(fileId: string, longEdge: number): Promise<Response | null> {
+  const meta = await driveRequest(`/drive/v3/files/${encodeURIComponent(fileId)}?fields=thumbnailLink`);
+  if (!meta.ok) return null;
+  const { thumbnailLink } = (await meta.json()) as { thumbnailLink?: string };
+  const url = thumbnailLink ? sizedThumbnailUrl(thumbnailLink, longEdge) : null;
+  if (!url) return null;
+  const response = await fetch(url, { headers: { authorization: `Bearer ${await googleAccessToken()}` } });
+  if (!response.ok || !response.headers.get("content-type")?.startsWith("image/")) return null;
   return response;
 }
 
