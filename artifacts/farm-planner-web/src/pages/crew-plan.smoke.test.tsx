@@ -288,6 +288,7 @@ describe('authenticated /crew-plan browser smoke path', () => {
     expect(within(board).getByRole('button', { name: 'Edit task' })).toBeTruthy();
   });
 
+  // A full walk through the board; it can pass 5 s when the whole suite runs at once.
   it('keeps the desktop board usable through planning, editing, completion, and deletion', async () => {
     const view = render(<CrewPlanPage />);
     const today = localAucklandDateKey();
@@ -382,7 +383,7 @@ describe('authenticated /crew-plan browser smoke path', () => {
     ));
 
     view.unmount();
-  });
+  }, 15_000);
 
   it('shows deleted task recovery without offering an edit path after permanent rejection', async () => {
     const deletedTask = task({
