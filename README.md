@@ -15,6 +15,8 @@ Every push to `main` runs the Cloud Build trigger `deploy-farm-tasks`, which bui
 
 Check a deploy in the Cloud console under Cloud Build > History.
 
+The deploy also creates or updates the Cloud Scheduler job `farm-tasks-keep-warm`. It calls `/api/healthz` every 10 minutes from 6:00 to 18:50 (Pacific/Auckland), so the crew's first tap after a quiet spell does not wait for a cold start. Change the times with the `_KEEP_WARM_SCHEDULE` substitution. If the build account cannot manage Cloud Scheduler, that step is skipped and the deploy still goes ahead.
+
 ## Google connection and calendar tasks
 
 - The app reads the farm task sheet, calendars, Drive attachments and Gmail as harnold@hirshberginstitute.com, through an OAuth client in the Google Cloud project `farm-tasks-login` (Hirshberg Workspace). Connect or reconnect at `/api/google/connect`.

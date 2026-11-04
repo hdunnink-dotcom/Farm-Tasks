@@ -7,6 +7,8 @@ substitutions:
   # Clerk publishable key: public by design (it ships in the web page), so it
   # lives here. A trigger substitution with the same name overrides it.
   _CLERK_PUBLISHABLE_KEY: "pk_test_c3VpdGVkLXNoZXBoZXJkLTUwODIuY2xlcmsuYWNjb3VudHMuZGV2JA"
+  # Keep-warm ping (Pacific/Auckland): every 10 minutes from 6:00 to 18:50.
+  _KEEP_WARM_SCHEDULE: "*/10 6-18 * * *"
 steps:
   - name: gcr.io/cloud-builders/docker
     args:
@@ -24,6 +26,23 @@ steps:
       - ${_SERVICE}
       - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID
       - --region=${_REGION}
+  # Keep the server awake while the crew works, so the first tap after a
+  # quiet spell does not wait for a cold start. Cloud Scheduler pings the
+  # health check (no database work) and costs next to nothing. Creates the
+  # job on the first deploy and updates it after. It can never stop a
+  # deploy: without Cloud Scheduler rights the step is skipped.
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: keep-warm-schedule
+    allowFailure: true
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -eu
+        url="$$(gcloud run services describe ${_SERVICE} --region=${_REGION} --format='value(status.url)')/api/healthz"
+        flags=(--location=${_REGION} --schedule="${_KEEP_WARM_SCHEDULE}" --time-zone=Pacific/Auckland --uri="$$url" --http-method=GET --attempt-deadline=30s)
+        gcloud scheduler jobs update http ${_SERVICE}-keep-warm "$${flags[@]}" \
+          || gcloud scheduler jobs create http ${_SERVICE}-keep-warm "$${flags[@]}"
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID
 options:
