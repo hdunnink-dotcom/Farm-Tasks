@@ -19,13 +19,17 @@ import {
   toAttachmentView,
 } from "../lib/farm-attachments";
 import { createPrivateDownloadUrl, getPrivateObject } from "../lib/object-storage";
-import { downloadDriveAttachment, uploadDriveAttachment } from "../lib/google-drive-storage";
+import { downloadDriveAttachment, downloadDriveThumbnail, uploadDriveAttachment } from "../lib/google-drive-storage";
 import { authDisabled, currentMember, isMaster } from "../lib/farm-access";
 import { listSheetTasks } from "../lib/farm-sheet";
 
 const router: IRouter = Router();
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
 const driveUploadBody = express.raw({ type: "*/*", limit: MAX_ATTACHMENT_SIZE });
+// An attachment's content never changes for its id, so phones can keep it.
+const ATTACHMENT_CACHE = "private, max-age=2592000, immutable";
+// Long edge of the preview tiles in a task (`?size=thumb`).
+const THUMBNAIL_EDGE = 640;
 
 function userId(req: Parameters<typeof getAuth>[0]): string | null {
   return getAuth(req).userId ?? (authDisabled ? "test-master" : null);
@@ -154,10 +158,23 @@ router.get("/attachments/:attachmentId/content", async (req, res): Promise<void>
       if (!task || !(task.assigneeIds?.includes(member.clerkId) || task.assigneeId === member.clerkId)) { res.status(403).json({ error: "You cannot view this attachment." }); return; }
     }
     if (record.storageProvider === "google_drive" && record.driveFileId) {
+      if (req.query.size === "thumb" && record.contentType.startsWith("image/")) {
+        const thumbnail = await downloadDriveThumbnail(record.driveFileId, THUMBNAIL_EDGE).catch((error: unknown) => {
+          req.log.warn({ err: error }, "Drive thumbnail unavailable; sending the original photo");
+          return null;
+        });
+        if (thumbnail?.body) {
+          res.setHeader("content-type", thumbnail.headers.get("content-type") || "image/jpeg");
+          res.setHeader("cache-control", ATTACHMENT_CACHE);
+          res.setHeader("content-disposition", `inline; filename*=UTF-8''${encodeURIComponent(record.name)}`);
+          Readable.fromWeb(thumbnail.body).pipe(res);
+          return;
+        }
+      }
       const driveResponse = await downloadDriveAttachment(record.driveFileId);
       res.setHeader("content-type", driveResponse.headers.get("content-type") || record.contentType);
       res.setHeader("content-length", driveResponse.headers.get("content-length") || String(record.size));
-      res.setHeader("cache-control", "private, max-age=300");
+      res.setHeader("cache-control", ATTACHMENT_CACHE);
       res.setHeader("content-disposition", `inline; filename*=UTF-8''${encodeURIComponent(record.name)}`);
       if (driveResponse.body) Readable.fromWeb(driveResponse.body).pipe(res);
       else res.end();
@@ -167,7 +184,7 @@ router.get("/attachments/:attachmentId/content", async (req, res): Promise<void>
     const [metadata] = await file.getMetadata();
     res.setHeader("content-type", (metadata.contentType as string) || record.contentType);
     res.setHeader("content-length", String(metadata.size ?? record.size));
-    res.setHeader("cache-control", "private, max-age=300");
+    res.setHeader("cache-control", ATTACHMENT_CACHE);
     res.setHeader("content-disposition", `inline; filename*=UTF-8''${encodeURIComponent(record.name)}`);
     Readable.fromWeb(file.createReadStream() as unknown as ReadableStream<Uint8Array>).pipe(res);
   } catch (error) {
