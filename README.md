@@ -11,7 +11,9 @@ Task planner for Mahakaruna Farm, Ngatimoti. Express API and React web planner i
 
 ## How changes go live
 
-Every push to `main` runs the Cloud Build trigger `deploy-farm-tasks`, which builds with `cloudbuild.yaml` and deploys to Cloud Run. The Clerk publishable key is set in `cloudbuild.yaml` (public by design); a trigger substitution can override it.
+Pushes run the Cloud Build trigger, which builds with `cloudbuild.yaml`. Only a push to `main` (or a manual `gcloud builds submit`) deploys to Cloud Run; a push to any other branch builds the image as a check and stops there, so work in progress never reaches the live app.
+
+The Clerk publishable key is `_WEB_CLERK_PUBLISHABLE_KEY` in `cloudbuild.yaml` (public by design). The trigger's old `_CLERK_PUBLISHABLE_KEY` setting had lost its leading "p" and is no longer read; it can be deleted from the trigger.
 
 Check a deploy in the Cloud console under Cloud Build > History.
 

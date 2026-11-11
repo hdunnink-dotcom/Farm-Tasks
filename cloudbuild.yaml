@@ -1,31 +1,38 @@
 # Build the container and deploy it to Cloud Run (Sydney).
 #   gcloud builds submit --config cloudbuild.yaml
+# Only main goes live. A push to any other branch builds the image as a
+# check and stops there. A manual `gcloud builds submit` has no branch and
+# deploys.
 substitutions:
   _REGION: australia-southeast1
   _SERVICE: farm-tasks
   _REPO: farm-tasks
   # Clerk publishable key: public by design (it ships in the web page), so it
-  # lives here. A trigger substitution with the same name overrides it.
-  _CLERK_PUBLISHABLE_KEY: "pk_test_c3VpdGVkLXNoZXBoZXJkLTUwODIuY2xlcmsuYWNjb3VudHMuZGV2JA"
+  # lives here. The trigger's old _CLERK_PUBLISHABLE_KEY setting had lost its
+  # leading "p", so this deliberately uses a different name and ignores it.
+  _WEB_CLERK_PUBLISHABLE_KEY: "pk_test_c3VpdGVkLXNoZXBoZXJkLTUwODIuY2xlcmsuYWNjb3VudHMuZGV2JA"
   # Keep-warm ping (Pacific/Auckland): every 10 minutes from 6:00 to 18:50.
   _KEEP_WARM_SCHEDULE: "*/10 6-18 * * *"
 steps:
   - name: gcr.io/cloud-builders/docker
     args:
       - build
-      - --build-arg=VITE_CLERK_PUBLISHABLE_KEY=${_CLERK_PUBLISHABLE_KEY}
+      - --build-arg=VITE_CLERK_PUBLISHABLE_KEY=${_WEB_CLERK_PUBLISHABLE_KEY}
       - -t=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID
       - .
   - name: gcr.io/cloud-builders/docker
     args: [push, "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID"]
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    entrypoint: gcloud
+    id: deploy
+    entrypoint: bash
     args:
-      - run
-      - deploy
-      - ${_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID
-      - --region=${_REGION}
+      - -c
+      - |
+        if [ -n "$BRANCH_NAME" ] && [ "$BRANCH_NAME" != "main" ]; then
+          echo "Branch $BRANCH_NAME: built as a check, not deployed. Merge to main to go live."
+          exit 0
+        fi
+        gcloud run deploy ${_SERVICE} --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/app:$BUILD_ID --region=${_REGION}
   # Keep the server awake while the crew works, so the first tap after a
   # quiet spell does not wait for a cold start. Cloud Scheduler pings the
   # health check (no database work) and costs next to nothing. Creates the
@@ -39,6 +46,7 @@ steps:
       - -c
       - |
         set -eu
+        if [ -n "$BRANCH_NAME" ] && [ "$BRANCH_NAME" != "main" ]; then exit 0; fi
         url="$$(gcloud run services describe ${_SERVICE} --region=${_REGION} --format='value(status.url)')/api/healthz"
         flags=(--location=${_REGION} --schedule="${_KEEP_WARM_SCHEDULE}" --time-zone=Pacific/Auckland --uri="$$url" --http-method=GET --attempt-deadline=30s)
         gcloud scheduler jobs update http ${_SERVICE}-keep-warm "$${flags[@]}" \
