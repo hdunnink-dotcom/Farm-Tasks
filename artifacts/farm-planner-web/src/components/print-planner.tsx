@@ -14,6 +14,7 @@ import {
   weekPrintGroups,
 } from '@/lib/task-print';
 import { trackEvent } from '@/lib/analytics';
+import { RoutePrintSheet } from './route-print-sheet';
 
 export function PrintPlanner({ tasks }: { tasks: FarmTask[] }) {
   const [open, setOpen] = useState(false);
@@ -65,7 +66,9 @@ export function PrintPlanner({ tasks }: { tasks: FarmTask[] }) {
               <button type="button" onClick={printTasks} disabled={taskCount === 0} data-testid="button-print-now" className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-2.5 text-sm font-semibold text-[hsl(var(--primary-foreground))] disabled:opacity-40"><Printer size={16} /> Print</button>
             </div>
         </Dialog.Content>
-        <PrintSheet period={period} selected={selected} groups={groups} />
+        {period === 'week'
+          ? <RoutePrintSheet eyebrow="Fieldbook · Weekly checklist" title={printPeriodLabel(period, selected)} groups={groups} emptyMessage="No open work is planned for this week." />
+          : <PrintSheet period={period} selected={selected} groups={groups} />}
       </Dialog.Portal>
     </Dialog.Root>
   );
