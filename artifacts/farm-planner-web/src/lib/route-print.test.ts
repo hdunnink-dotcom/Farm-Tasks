@@ -51,6 +51,12 @@ describe('buildRoutePrint', () => {
     expect(cards[0].notes.record).toEqual(['RECORD in the BioGro diary: litres.']);
   });
 
+  it('gives no numbers or instruction cards for an overview-only print', () => {
+    const { rows, cards } = buildRoutePrint(groups, '', false);
+    expect(cards).toEqual([]);
+    expect(rows.every((row) => row.kind !== 'task' || row.ref === null)).toBe(true);
+  });
+
   it('reports no jobs when the week is empty', () => {
     expect(buildRoutePrint([{ key: '2026-11-02', label: 'Monday 2 Nov', tasks: [] }]).jobCount).toBe(0);
   });

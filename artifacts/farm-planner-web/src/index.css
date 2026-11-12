@@ -729,60 +729,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     font-size: 16pt;
   }
 
-  .print-task-group {
-    break-inside: auto;
-    page-break-inside: auto;
-    margin-bottom: 14px;
-  }
-
-  .print-group-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid #aeb8b2;
-    padding: 5px 0;
-  }
-
-  .print-group-heading h2 {
-    margin: 0;
-    color: #234b3a;
-    font-size: 12pt;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-  }
-
-  .print-group-heading span {
-    color: #59675f;
-    font-size: 10pt;
-  }
-
-  .print-task-row {
-    position: relative;
-    display: block;
-    border-bottom: 1px solid #e2e6e3;
-    padding: 8px 0 8px 22px;
-    break-inside: auto;
-    page-break-inside: auto;
-  }
-
-  .print-checkbox {
-    position: absolute;
-    top: 9px;
-    left: 0;
-    width: 11px;
-    height: 11px;
-    border: 1.4px solid #234b3a;
-    border-radius: 2px;
-  }
-
-  .print-task-row h3 {
-    margin: 0;
-    font-size: 11pt;
-    line-height: 1.3;
-  }
-
-  /* Week prints (weekly route, weekly checklist): an overview of every job
-     by day, then each job's instructions once, in two columns. Kept compact
+  /* Week and month prints: an overview of every job by day; week prints
+     then add each job's instructions once, in two columns. Kept compact
      on purpose (the owner chose this over larger type): 9 pt overview, 8 pt
      instructions, black text so it reads outdoors and in black and white. */
   .route-print {

@@ -1,6 +1,7 @@
 import type { FarmTask } from '@workspace/api-client-react';
 import type { NoteBlock } from '@/lib/print-notes';
 import { buildRoutePrint, type RoutePrintGroup } from '@/lib/route-print';
+import { monthPrintGroups, printPeriodLabel } from '@/lib/task-print';
 
 function Priority({ urgency }: { urgency: FarmTask['urgency'] }) {
   return <span className={`route-print-priority is-${urgency.toLowerCase()}`}>{urgency}</span>;
@@ -33,15 +34,18 @@ function NoteBlocks({ blocks }: { blocks: NoteBlock[] }) {
  * Compact A4 week print: an overview of every job by day, then each job's
  * instructions once, in two columns, with a write-in strip for BioGro records.
  */
-export function RoutePrintSheet({ eyebrow, title, groups, printedFor = '', emptyMessage }: {
+export function RoutePrintSheet({ eyebrow, title, groups, printedFor = '', emptyMessage, overviewTitle = 'Week at a glance', instructions = true }: {
   eyebrow: string;
   title: string;
   groups: RoutePrintGroup[];
   /** Left out of the "with" column, e.g. the worker whose route this is. */
   printedFor?: string;
   emptyMessage: string;
+  overviewTitle?: string;
+  /** Print each job's instructions after the overview (weeks), or the overview only (months). */
+  instructions?: boolean;
 }) {
-  const { rows, cards, jobCount } = buildRoutePrint(groups, printedFor);
+  const { rows, cards, jobCount } = buildRoutePrint(groups, printedFor, instructions);
   const printed = new Intl.DateTimeFormat('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date());
   return (
     <article className="print-planner-sheet route-print" aria-hidden="true" data-testid="route-print-sheet">
@@ -50,11 +54,11 @@ export function RoutePrintSheet({ eyebrow, title, groups, printedFor = '', empty
           <p className="route-print-eyebrow">{eyebrow}</p>
           <h1>{title}</h1>
         </div>
-        <p className="route-print-meta">{jobCount} job{jobCount === 1 ? '' : 's'} · {cards.length} with instructions<br />Printed {printed}</p>
+        <p className="route-print-meta">{jobCount} job{jobCount === 1 ? '' : 's'}{instructions ? ` · ${cards.length} with instructions` : ''}<br />Printed {printed}</p>
       </header>
       {jobCount === 0 ? <p className="route-print-empty">{emptyMessage}</p> : (
         <>
-          <h2>Week at a glance</h2>
+          <h2>{overviewTitle}</h2>
           <table className="route-print-glance">
             <tbody>
               {rows.map((row, index) => {
@@ -73,7 +77,7 @@ export function RoutePrintSheet({ eyebrow, title, groups, printedFor = '', empty
               })}
             </tbody>
           </table>
-          {cards.length > 0 && <p className="route-print-legend">Numbers on the right point to the instructions below. Black label = urgent, boxed = high.</p>}
+          <p className="route-print-legend">{cards.length > 0 && 'Numbers on the right point to the instructions below. '}Black label = urgent, boxed = high.</p>
           {cards.length > 0 && (
             <section className="route-print-instructions">
               <h2>Instructions</h2>
@@ -105,5 +109,19 @@ export function RoutePrintSheet({ eyebrow, title, groups, printedFor = '', empty
         </>
       )}
     </article>
+  );
+}
+
+/** Every job still to do in a month, as one overview without the instruction pages. */
+export function MonthToDoPrintSheet({ tasks, month }: { tasks: FarmTask[]; month: Date }) {
+  return (
+    <RoutePrintSheet
+      eyebrow="Fieldbook · Month to-do"
+      title={printPeriodLabel('month', month)}
+      groups={monthPrintGroups(tasks, month)}
+      overviewTitle="Still to do"
+      instructions={false}
+      emptyMessage="Nothing left to do this month."
+    />
   );
 }

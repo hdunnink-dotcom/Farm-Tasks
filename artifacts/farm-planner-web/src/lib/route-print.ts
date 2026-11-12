@@ -63,8 +63,9 @@ function dayLabel(key: string): string {
  * Lays out a week for paper: one overview row per job per day (runs of empty
  * days folded into one line), and each job's instructions once, numbered in
  * the order they first appear. `printedFor` is left out of the "with" column.
+ * Without `instructions` (a month to-do list) jobs get no numbers or cards.
  */
-export function buildRoutePrint(groups: RoutePrintGroup[], printedFor = ''): RoutePrint {
+export function buildRoutePrint(groups: RoutePrintGroup[], printedFor = '', instructions = true): RoutePrint {
   const rows: GlanceRow[] = [];
   const refs = new Map<string, number>();
   const daysById = new Map<string, string[]>();
@@ -95,9 +96,11 @@ export function buildRoutePrint(groups: RoutePrintGroup[], printedFor = ''): Rou
     for (const { task, time } of ordered) {
       tasksById.set(task.id, task);
       if (isDay) daysById.set(task.id, [...(daysById.get(task.id) ?? []), group.key]);
-      if ((task.notes?.trim() || task.subtasks?.length) && !refs.has(task.id)) refs.set(task.id, refs.size + 1);
+      if (instructions && (task.notes?.trim() || task.subtasks?.length) && !refs.has(task.id)) refs.set(task.id, refs.size + 1);
       const scheduled = taskScheduledDateKeys(task);
-      const span = isDay && scheduled.length > 1 ? `day ${scheduled.indexOf(group.key) + 1} of ${scheduled.length}` : '';
+      const span = isDay
+        ? scheduled.length > 1 ? `day ${scheduled.indexOf(group.key) + 1} of ${scheduled.length}` : ''
+        : group.key === 'overdue' && scheduled.length ? `was due ${dayLabel(scheduled[scheduled.length - 1])}` : '';
       rows.push({
         kind: 'task',
         task,

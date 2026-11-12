@@ -14,7 +14,7 @@ import {
   weekPrintGroups,
 } from '@/lib/task-print';
 import { trackEvent } from '@/lib/analytics';
-import { RoutePrintSheet } from './route-print-sheet';
+import { MonthToDoPrintSheet, RoutePrintSheet } from './route-print-sheet';
 
 export function PrintPlanner({ tasks }: { tasks: FarmTask[] }) {
   const [open, setOpen] = useState(false);
@@ -68,41 +68,8 @@ export function PrintPlanner({ tasks }: { tasks: FarmTask[] }) {
         </Dialog.Content>
         {period === 'week'
           ? <RoutePrintSheet eyebrow="Fieldbook · Weekly checklist" title={printPeriodLabel(period, selected)} groups={groups} emptyMessage="No open work is planned for this week." />
-          : <PrintSheet period={period} selected={selected} groups={groups} />}
+          : <MonthToDoPrintSheet tasks={tasks} month={selected} />}
       </Dialog.Portal>
     </Dialog.Root>
-  );
-}
-
-function PrintSheet({ period, selected, groups }: { period: PrintPeriod; selected: Date; groups: ReturnType<typeof weekPrintGroups> }) {
-  return (
-    <article className={`print-planner-sheet print-planner-${period}`} aria-hidden="true">
-      <header>
-        <p>Fieldbook · {period === 'week' ? 'Weekly' : 'Monthly'} checklist</p>
-        <h1>{printPeriodLabel(period, selected)}</h1>
-      </header>
-      <main>
-        {groups.map((group) => (
-          <section key={group.key} className="print-task-group">
-            <div className="print-group-heading"><h2>{group.label}</h2><span>{group.tasks.length || '—'}</span></div>
-            {group.tasks.length === 0 ? <div className="print-empty-line" /> : group.tasks.map((task) => (
-              <div key={task.id} className="print-task-row">
-                <span className="print-checkbox" />
-                <div>
-                  <h3>{task.task}</h3>
-                  <p>{[
-                    task.group || 'General',
-                    task.urgency,
-                    task.location || '',
-                    task.assigneeName ? `Assigned to ${task.assigneeName}` : '',
-                  ].filter(Boolean).join(' · ')}</p>
-                </div>
-              </div>
-            ))}
-          </section>
-        ))}
-      </main>
-      <footer>Printed {new Intl.DateTimeFormat('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date())}</footer>
-    </article>
   );
 }
