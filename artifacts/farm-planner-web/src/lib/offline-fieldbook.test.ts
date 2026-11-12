@@ -278,6 +278,15 @@ describe('useOfflineFieldbook', () => {
     expect(listFarmTasks).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps a morning task on its Auckland day when the server stores the start in UTC', async () => {
+    const { normalizePersistedState } = await import('./offline-fieldbook');
+    // 10 am on Tue 3 Nov in Auckland is 9 pm on Mon 2 Nov in UTC.
+    const state = normalizePersistedState({ tasks: [task({ calendarStart: '2026-11-02T21:00:00.000Z', scheduledDates: ['2026-11-03'] } as Partial<TestTask>)] });
+    expect(state.tasks[0].scheduledDates).toEqual(['2026-11-03']);
+    const dateOnly = normalizePersistedState({ tasks: [task({ calendarStart: '2026-11-03' } as Partial<TestTask>)] });
+    expect(dateOnly.tasks[0].scheduledDates).toEqual(['2026-11-03']);
+  });
+
   it('shows a ticked task straight away, before it is stored', async () => {
     const result = await loadHook();
     await result.result.current.saveTask(undefined, { task: 'Check the gate' });
