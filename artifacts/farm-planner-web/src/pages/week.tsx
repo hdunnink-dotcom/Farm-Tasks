@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/react';
-import { addWeeks, subWeeks, startOfWeek, endOfWeek, format } from 'date-fns';
+import { addDays, addWeeks, subWeeks, startOfWeek, endOfWeek, format } from 'date-fns';
 import { Check, ChevronLeft, ChevronRight, RefreshCw, CalendarDays, MapPin, Printer } from 'lucide-react';
 import { type FarmTask } from '@workspace/api-client-react';
 import { ErrorState, PageHeader, PlannerShell, RetryPendingChangesButton, SourcePill, SyncNotice, TaskDetailsDialog } from '@/components/farm-planner';
@@ -10,6 +10,8 @@ import { getTaskWeekGroups, sortWeekTasks, ALL_GROUPS_IN_ORDER, type WeekGroup }
 import { useMe } from '@/hooks/use-me';
 import { useWorkers } from '@/hooks/use-workers';
 import { trackEvent } from '@/lib/analytics';
+import { RoutePrintSheet } from '@/components/route-print-sheet';
+import type { RoutePrintGroup } from '@/lib/route-print';
 
 export default function WeekPage() {
   const { isLoaded, isSignedIn, userId } = useAuth();
@@ -208,6 +210,8 @@ export default function WeekPage() {
   );
 }
 
+const ROUTE_DAYS: WeekGroup[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 export function WeeklyRoutePrintSheet({
   selectedWeekStart,
   groups,
@@ -217,68 +221,27 @@ export function WeeklyRoutePrintSheet({
   groups: Record<WeekGroup, FarmTask[]>;
   workerLabel: string;
 }) {
-  const populatedGroups = ALL_GROUPS_IN_ORDER
-    .map((group) => ({ group, tasks: groups[group] }))
-    .filter(({ tasks }) => tasks.length > 0);
-
+  const weekEnd = endOfWeek(selectedWeekStart, { weekStartsOn: 1 });
+  const sameMonth = selectedWeekStart.getMonth() === weekEnd.getMonth();
+  const title = `${format(selectedWeekStart, sameMonth ? 'EEE d' : 'EEE d MMM')} – ${format(weekEnd, 'EEE d MMM yyyy')}`;
+  // Paper is for the work still to do.
+  const open = (tasks: FarmTask[]) => tasks.filter((task) => !task.done);
+  const printGroups: RoutePrintGroup[] = [
+    { key: 'overdue', label: 'Overdue', tasks: open(groups.Overdue) },
+    ...ROUTE_DAYS.map((day, index) => {
+      const date = addDays(selectedWeekStart, index);
+      return { key: format(date, 'yyyy-MM-dd'), label: format(date, 'EEEE d MMM'), tasks: open(groups[day]) };
+    }),
+    { key: 'unscheduled', label: 'Any day this week', tasks: open(groups.Unscheduled) },
+  ];
   return (
-    <article className="print-planner-sheet print-planner-weekly-route" aria-hidden="true">
-      <header>
-        <div>
-          <p>Fieldbook · Weekly route</p>
-          <h1>
-            {format(selectedWeekStart, 'MMM d')} – {format(endOfWeek(selectedWeekStart, { weekStartsOn: 1 }), 'MMM d, yyyy')}
-          </h1>
-        </div>
-        <p>{workerLabel}</p>
-      </header>
-      <main>
-        {populatedGroups.length === 0 ? (
-          <p className="print-no-work">No open work is scheduled for this week.</p>
-        ) : populatedGroups.map(({ group, tasks }) => {
-          return (
-            <section key={group} className="print-task-group">
-              <div className="print-group-heading">
-                <h2>{group}</h2>
-                <span>{tasks.length}</span>
-              </div>
-              {tasks.map((task) => (
-                <div key={task.id} className="print-task-row">
-                  <span className="print-checkbox" />
-                  <div>
-                    <h3>{task.task}</h3>
-                    <p className="print-task-meta">{[
-                      task.group || 'General',
-                      task.urgency,
-                      task.location || '',
-                    ].filter(Boolean).join(' · ')}</p>
-                    {task.notes && (
-                      <p className="print-task-notes" data-testid={`print-task-notes-${task.id}`}>
-                        {task.notes}
-                      </p>
-                    )}
-                    {task.subtasks?.length > 0 && (
-                      <div className="print-task-steps" data-testid={`print-task-steps-${task.id}`}>
-                        <p className="print-task-section-label">Steps</p>
-                        <ul>
-                          {task.subtasks.map((step) => (
-                            <li key={step.id} className={step.done ? 'is-done' : undefined}>
-                              <span className="print-step-bullet" aria-hidden="true">{step.done ? '✓' : '•'}</span>
-                              <span>{step.title}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </section>
-          );
-        })}
-      </main>
-      <footer>Printed {new Intl.DateTimeFormat('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date())}</footer>
-    </article>
+    <RoutePrintSheet
+      eyebrow={`Fieldbook · Weekly route · ${workerLabel}`}
+      title={title}
+      groups={printGroups}
+      printedFor={workerLabel === 'My route' ? '' : workerLabel}
+      emptyMessage="No open work is scheduled for this week."
+    />
   );
 }
 

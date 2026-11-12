@@ -79,18 +79,24 @@ export function weekPrintGroups(tasks: FarmTask[], selected: Date): PrintTaskGro
   ];
 }
 
-export function monthPrintGroups(tasks: FarmTask[], selected: Date): PrintTaskGroup[] {
+/**
+ * A month's open work by day. For the current month, days already gone are
+ * not listed: work still open from them is gathered under Overdue at the top.
+ */
+export function monthPrintGroups(tasks: FarmTask[], selected: Date, today = new Date()): PrintTaskGroup[] {
   const monthStart = new Date(selected.getFullYear(), selected.getMonth(), 1);
   const monthEnd = new Date(selected.getFullYear(), selected.getMonth() + 1, 1);
+  const todayStart = startOfDay(today);
+  const from = todayStart > monthStart && todayStart < monthEnd ? todayStart : monthStart;
   const selectedMonth = localMonthKey(selected);
   const open = tasks.filter((task) => !task.done);
   const overdue = open.filter((task) => {
     const dates = taskDates(task);
-    return !dates.some((date) => date >= monthStart && date < monthEnd) && dates.some((date) => date < monthStart);
+    return !dates.some((date) => date >= from && date < monthEnd) && dates.some((date) => date < from);
   }).sort(prioritySort);
   const byDate = new Map<string, FarmTask[]>();
   open.forEach((task) => {
-    taskDates(task).filter((date) => date >= monthStart && date < monthEnd).forEach((date) => {
+    taskDates(task).filter((date) => date >= from && date < monthEnd).forEach((date) => {
       const key = toDateInputValue(date);
       const tasksForDate = byDate.get(key) ?? [];
       if (!tasksForDate.some((item) => item.id === task.id)) byDate.set(key, [...tasksForDate, task]);
@@ -98,7 +104,7 @@ export function monthPrintGroups(tasks: FarmTask[], selected: Date): PrintTaskGr
   });
   const dateGroups = Array.from(byDate.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([key, dayTasks]) => ({
     key,
-    label: new Intl.DateTimeFormat('en-NZ', { weekday: 'short', day: 'numeric', month: 'long' }).format(new Date(`${key}T12:00:00`)),
+    label: new Intl.DateTimeFormat('en-NZ', { weekday: 'short', day: 'numeric', month: 'long' }).format(new Date(`${key}T12:00:00`)).replace(',', ''),
     tasks: dayTasks.sort(prioritySort),
   }));
   const anyTime = open.filter((task) => !taskDates(task).length && taskMatchesMonth(task, selectedMonth)).sort(prioritySort);

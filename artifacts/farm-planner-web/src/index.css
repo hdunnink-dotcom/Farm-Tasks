@@ -666,13 +666,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   }
 
   body:has(.print-planner-sheet) .planner-sidebar,
-  body:has(.print-planner-sheet) .planner-main > .page-enter {
+  body:has(.print-planner-sheet) .planner-main > .page-enter,
+  body:has(.print-planner-sheet) .mobile-topbar,
+  body:has(.print-planner-sheet) .mobile-nav {
     display: none !important;
   }
 
+  /* A4 is narrower than the desktop layout, so the phone styles apply in
+     print: drop the space they keep for the phone menu bar, which otherwise
+     pushes a blank sheet out of the printer. */
   body:has(.print-planner-sheet) .planner-main {
     display: block !important;
     min-height: 0 !important;
+    padding: 0 !important;
     position: static !important;
   }
 
@@ -723,114 +729,294 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     font-size: 16pt;
   }
 
-  .print-task-group {
-    break-inside: auto;
-    page-break-inside: auto;
-    margin-bottom: 14px;
+  /* Week and month prints: an overview of every job by day; week prints
+     then add each job's instructions once, in two columns. Kept compact
+     on purpose (the owner chose this over larger type): 9 pt overview, 8 pt
+     instructions, black text so it reads outdoors and in black and white. */
+  .route-print {
+    color: #111;
+    font-size: 9pt;
+    line-height: 1.25;
   }
 
-  .print-group-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid #aeb8b2;
-    padding: 5px 0;
+  .route-print header {
+    align-items: flex-end;
+    border-bottom: 2px solid #234b3a;
+    padding-bottom: 5px;
+    margin-bottom: 6px;
   }
 
-  .print-group-heading h2 {
+  .route-print .route-print-eyebrow {
     margin: 0;
     color: #234b3a;
-    font-size: 12pt;
+    font-size: 8pt;
+    font-weight: 700;
+  }
+
+  .route-print h1 {
+    margin: 1px 0 0;
+    font-size: 15pt;
+  }
+
+  .route-print .route-print-meta {
+    color: #444;
+    font-size: 8pt;
+    text-align: right;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .route-print h2 {
+    margin: 8px 0 4px;
+    color: #234b3a;
+    font-size: 9pt;
+    letter-spacing: .1em;
     text-transform: uppercase;
-    letter-spacing: .06em;
   }
 
-  .print-group-heading span {
-    color: #59675f;
-    font-size: 10pt;
+  .route-print-glance {
+    width: 100%;
+    border-collapse: collapse;
   }
 
-  .print-task-row {
-    position: relative;
-    display: block;
-    border-bottom: 1px solid #e2e6e3;
-    padding: 8px 0 8px 22px;
-    break-inside: auto;
-    page-break-inside: auto;
+  .route-print-glance th {
+    padding: 3px 6px;
+    border-top: 1px solid #b9c6bd;
+    background: #e8eee9;
+    color: #17261f;
+    font-size: 8.5pt;
+    text-align: left;
+    letter-spacing: .04em;
   }
 
-  .print-checkbox {
-    position: absolute;
-    top: 9px;
-    left: 0;
-    width: 11px;
-    height: 11px;
-    border: 1.4px solid #234b3a;
+  .route-print-glance tr.is-empty th {
+    background: none;
+    color: #555;
+    font-weight: normal;
+  }
+
+  .route-print-glance tr.is-empty span {
+    font-style: italic;
+  }
+
+  .route-print-glance td {
+    padding: 2px 5px;
+    border-bottom: 1px solid #e3e7e4;
+    vertical-align: top;
+  }
+
+  .route-print-glance tr {
+    break-inside: avoid;
+  }
+
+  .route-print-box {
+    width: 18px;
+  }
+
+  .route-print-box span,
+  .route-print-steps span {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1.3px solid #234b3a;
     border-radius: 2px;
   }
 
-  .print-task-row h3 {
-    margin: 0;
-    font-size: 11pt;
-    line-height: 1.3;
+  .route-print-time {
+    width: 58px;
+    font-weight: 700;
+    white-space: nowrap;
   }
 
-  .print-task-meta,
-  .print-task-notes,
-  .print-task-section-label,
-  .print-task-steps li,
-  .print-no-work {
-    margin: 2px 0 0;
-    color: #59675f;
-    font-size: 10pt;
-    line-height: 1.4;
+  .route-print-span {
+    color: #555;
+    font-size: 7.5pt;
   }
 
-  .print-task-notes {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+  .route-print-with {
+    width: 92px;
+    color: #444;
+    font-size: 8pt;
   }
 
-  .print-task-steps {
-    margin-top: 8px;
-    break-inside: auto;
-    page-break-inside: auto;
+  .route-print-ref {
+    width: 26px;
+    text-align: right;
   }
 
-  .print-task-section-label {
-    margin: 0 0 2px;
-    color: #234b3a;
+  .route-print-ref b {
+    display: inline-block;
+    min-width: 16px;
+    border: 1px solid #234b3a;
+    border-radius: 8px;
+    font-size: 7.5pt;
+    text-align: center;
+  }
+
+  .route-print-priority {
+    font-size: 7pt;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .route-print-priority.is-urgent {
+    padding: 0 4px;
+    border-radius: 2px;
+    background: #111;
+    color: #fff;
+    font-weight: 700;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .route-print-priority.is-high {
+    padding: 0 3px;
+    border: 1px solid #111;
+    border-radius: 2px;
     font-weight: 700;
   }
 
-  .print-task-steps ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
+  .route-print-priority.is-medium,
+  .route-print-priority.is-low {
+    color: #555;
   }
 
-  .print-task-steps li {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    margin-top: 2px;
-    color: #17261f;
+  .route-print-legend,
+  .route-print-empty {
+    margin: 4px 0 0;
+    color: #555;
+    font-size: 7.5pt;
   }
 
-  .print-task-steps li.is-done {
-    color: #59675f;
-    text-decoration: line-through;
-  }
-
-  .print-step-bullet {
-    flex: 0 0 12px;
-    color: #234b3a;
-    font-weight: 700;
-  }
-
-  .print-no-work {
+  .route-print-empty {
     margin: 22px 0;
-    color: #59675f;
+    font-size: 10pt;
+  }
+
+  .route-print-instructions {
+    margin-top: 10px;
+    column-count: 2;
+    column-gap: 7mm;
+  }
+
+  .route-print-instructions h2 {
+    column-span: all;
+    margin-top: 0;
+    padding-top: 5px;
+    border-top: 2px solid #234b3a;
+  }
+
+  .route-print-card {
+    margin: 0 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1.5px solid #234b3a;
+    font-size: 8pt;
+  }
+
+  .route-print-card p {
+    margin: 0 0 1px;
+  }
+
+  .route-print-card ul {
+    margin: 0 0 3px;
+    padding-left: 12px;
+  }
+
+  .route-print-card-head {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 3px;
+    break-after: avoid;
+    break-inside: avoid;
+  }
+
+  .route-print-number {
+    flex: none;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: #234b3a;
+    color: #fff;
+    font-size: 8pt;
+    font-weight: 700;
+    line-height: 17px;
+    text-align: center;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .route-print-card-head h3 {
+    margin: 0;
+    font-size: 9pt;
+    line-height: 1.2;
+  }
+
+  .route-print-card-head p {
+    margin: 1px 0 0;
+    color: #444;
+    font-size: 7.5pt;
+  }
+
+  .route-print-subheading {
+    margin-top: 3px !important;
+    color: #234b3a;
+    font-size: 7.8pt;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    break-after: avoid;
+  }
+
+  .route-print-step {
+    padding-left: 2px;
+  }
+
+  .route-print-reason {
+    color: #555;
+    font-size: 7.6pt;
+    font-style: italic;
+  }
+
+  .route-print-reason .route-print-subheading {
+    color: #555;
+  }
+
+  .route-print-warning {
+    margin: 3px 0;
+    padding: 2px 5px;
+    border-left: 3px solid #111;
+    background: #f1f1f1;
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .route-print-steps {
+    margin: 2px 0 4px;
+  }
+
+  .route-print-steps p {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+  }
+
+  .route-print-steps span.is-done {
+    background: #234b3a;
+  }
+
+  .route-print-record {
+    margin-top: 4px;
+    padding: 3px 5px;
+    border: 1px dashed #777;
+    font-size: 7.8pt;
+    break-inside: avoid;
+  }
+
+  .route-print-record .route-print-fill {
+    margin-top: 5px;
+    color: #333;
   }
 
   .print-planner-sheet footer {

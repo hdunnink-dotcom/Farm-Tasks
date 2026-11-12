@@ -13,7 +13,7 @@ import {
   type TaskSummary,
 } from '@workspace/api-client-react';
 import { CURRENT_MONTH } from './task-month';
-import { type CalendarScope, localWeekStart } from './task-calendar';
+import { type CalendarScope, calendarStartDayKey, localWeekStart } from './task-calendar';
 import { type TaskSort } from './task-sort';
 import { trackEvent } from './analytics';
 
@@ -111,9 +111,9 @@ function normalizeStringArray(value: unknown): string[] {
 
 function normalizeScheduledDates(value: unknown, calendarStart: unknown): string[] {
   const dates = Array.isArray(value) ? value.filter((item): item is string => /^\d{4}-\d{2}-\d{2}$/.test(item)) : [];
-  const legacy = typeof calendarStart === 'string' && /^\d{4}-\d{2}-\d{2}/.test(calendarStart)
-    ? calendarStart.slice(0, 10)
-    : '';
+  // The server stores timed starts in UTC. A 9 am start in Auckland is the
+  // previous day in UTC, so take the day in Auckland, not the first 10 characters.
+  const legacy = typeof calendarStart === 'string' ? calendarStartDayKey(calendarStart) ?? '' : '';
   return Array.from(new Set([...dates, ...(legacy ? [legacy] : [])])).sort();
 }
 

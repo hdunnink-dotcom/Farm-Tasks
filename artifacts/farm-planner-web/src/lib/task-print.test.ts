@@ -50,6 +50,21 @@ describe('print task grouping', () => {
     expect(groups.map((group) => group.key)).toEqual(['2026-08-03', '2026-08-19', 'any-time']);
   });
 
+  it('gathers this month\'s missed work under Overdue and lists only the days ahead', () => {
+    const groups = monthPrintGroups([
+      task('missed', { calendarStart: '2026-11-03' }),
+      task('today', { calendarStart: '2026-11-12' }),
+      task('ahead', { calendarStart: '2026-11-20' }),
+      task('done', { calendarStart: '2026-11-20', done: true }),
+    ], new Date('2026-11-01T12:00:00'), new Date('2026-11-12T13:00:00'));
+
+    expect(groups.map((group) => [group.key, group.tasks.map((item) => item.id)])).toEqual([
+      ['overdue', ['missed']],
+      ['2026-11-12', ['today']],
+      ['2026-11-20', ['ahead']],
+    ]);
+  });
+
   it('shows linked work in every scheduled day group without duplicating it in overdue', () => {
     const linked = task('linked', {
       calendarStart: '2026-08-20',
