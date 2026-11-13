@@ -475,16 +475,23 @@ router.patch("/tasks/:taskId", async (req, res): Promise<void> => {
       res.status(400).json({ error: "Imported calendar tasks cannot be made into manual recurrence routines." });
       return;
     }
+    // A bare empty calendarStart (no scheduledDates alongside it) is a stale or
+    // partial client value, not an unschedule: the planner's unschedule always
+    // sends scheduledDates too. Without this, completing or reassigning a
+    // recurring task whose saved start is blank fails and jams the phone's
+    // offline queue.
+    const incoming = { ...body.data };
+    if (incoming.calendarStart === "" && incoming.scheduledDates === undefined) delete incoming.calendarStart;
     const sheetInput = existing.source === "Google Calendar"
-      ? withoutClearedCalendarDate(normalizeSheetTaskInput(body.data))
-      : normalizeSheetTaskInput(body.data);
+      ? withoutClearedCalendarDate(normalizeSheetTaskInput(incoming))
+      : normalizeSheetTaskInput(incoming);
     const assignments = isMaster(member) ? await authorizedAssignments(body.data) : undefined;
     if (assignments === null) {
       res.status(400).json({ error: "Every assignee must be a current or invited farm team member." });
       return;
     }
     const effectiveRecurrence = sheetInput.recurrence ?? existing.recurrence ?? (existing.repeatWeekly ? "weekly" : "none");
-    const effectiveCalendarStart = sheetInput.calendarStart ?? existing.calendarStart;
+    const effectiveCalendarStart = sheetInput.calendarStart ?? (existing.calendarStart || taskScheduledDates(existing)[0]);
     if (effectiveRecurrence !== "none" && !effectiveCalendarStart) {
       res.status(400).json({ error: effectiveRecurrence === "weekly"
         ? "Weekly tasks require a scheduled calendar start."
