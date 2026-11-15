@@ -119,17 +119,27 @@ function normalizeScheduledDates(value: unknown, calendarStart: unknown): string
 
 const recurrenceValues = new Set(['none', 'weekly', 'biweekly', 'every4weeks', 'monthly', 'quarterly', 'yearly']);
 
-function normalizeQueuedTaskInput(value: unknown): { data?: TaskInput; repairedRecurrence: boolean } {
-  if (!value || typeof value !== 'object') return { data: undefined, repairedRecurrence: false };
+function normalizeQueuedTaskInput(value: unknown): { data?: TaskInput; repairedRecurrence: boolean; repairedSchedule: boolean } {
+  if (!value || typeof value !== 'object') return { data: undefined, repairedRecurrence: false, repairedSchedule: false };
   const input = { ...(value as Record<string, unknown>) };
-  input.scheduledDates = normalizeScheduledDates(input.scheduledDates, input.calendarStart);
+  // Only a change that sets the schedule carries dates; the planner always
+  // sends calendarStart with them. Earlier versions added an empty date list
+  // to every change, so a tick wiped a one-off task's dates and was refused
+  // for a repeating task ("... require a scheduled calendar start"). Drop
+  // that empty list from changes already waiting in the queue.
+  const repairedSchedule = input.calendarStart === undefined
+    && Array.isArray(input.scheduledDates) && input.scheduledDates.length === 0;
+  if (repairedSchedule) delete input.scheduledDates;
+  if (input.scheduledDates !== undefined || input.calendarStart !== undefined) {
+    input.scheduledDates = normalizeScheduledDates(input.scheduledDates, input.calendarStart);
+  }
   if (!Object.prototype.hasOwnProperty.call(input, 'recurrence')
     || recurrenceValues.has(input.recurrence as string)) {
-    return { data: input as unknown as TaskInput, repairedRecurrence: false };
+    return { data: input as unknown as TaskInput, repairedRecurrence: false, repairedSchedule };
   }
   input.recurrence = input.repeatWeekly === true ? 'weekly' : 'none';
   input.repeatWeekly = input.recurrence === 'weekly';
-  return { data: input as unknown as TaskInput, repairedRecurrence: true };
+  return { data: input as unknown as TaskInput, repairedRecurrence: true, repairedSchedule };
 }
 
 function normalizeCachedTask(value: unknown): FarmTask | null {
@@ -213,12 +223,13 @@ export function normalizePersistedState(value: unknown): PersistedState {
       .map((mutation) => {
         const task = normalizeCachedTask(mutation.task);
         const normalizedInput = normalizeQueuedTaskInput(mutation.data);
-        const repairedFailure = normalizedInput.repairedRecurrence && mutation.lastError === 'Needs attention';
+        const repairedFailure = (normalizedInput.repairedRecurrence || normalizedInput.repairedSchedule)
+          && mutation.lastError === 'Needs attention';
         return {
           ...mutation,
           data: normalizedInput.data,
           task: task ?? undefined,
-          ...(repairedFailure ? { nextAttemptAt: 0, lastError: undefined } : {}),
+          ...(repairedFailure ? { nextAttemptAt: 0, lastError: undefined, serverMessage: undefined } : {}),
         };
       })
     : [];

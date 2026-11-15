@@ -161,12 +161,31 @@ export function nextAucklandWeek(calendarStart: string): string {
   return nextAucklandOccurrence(calendarStart, "weekly");
 }
 
+const OCCURRENCE_SUFFIX = /--(?:weekly|biweekly|every4weeks|monthly|quarterly|yearly)-\d{4}-\d{2}-\d{2}$/;
+
 /** Sheet-only recovery for a completed routine whose follow-up write failed. */
 export async function ensureNextOccurrence(task: SheetTask): Promise<void> {
   const recurrence = task.recurrence ?? (task.repeatWeekly ? "weekly" : "none");
   if (task.source !== "Manual" || recurrence === "none" || !task.done || !task.calendarStart || (task.reviewStatus && task.reviewStatus !== "approved")) return;
-  const calendarStart = nextAucklandOccurrence(task.calendarStart, recurrence);
-  const seriesId = task.id.replace(/--(?:weekly|biweekly|every4weeks|monthly|quarterly|yearly)-\d{4}-\d{2}-\d{2}$/, "");
+  const seriesId = task.id.replace(OCCURRENCE_SUFFIX, "");
+  let calendarStart = nextAucklandOccurrence(task.calendarStart, recurrence);
+  // An overdue routine ticked late (a weekly check from 7 Sep ticked on
+  // 16 Nov) continues from the first occurrence after the day it was done,
+  // not with a string of occurrences that are already overdue.
+  const doneDay = task.updatedAt ? aucklandDateKey(task.updatedAt) : "";
+  if (doneDay && aucklandDateKey(calendarStart) <= doneDay) {
+    // updatedAt moves when a done row is edited later, so this date is not
+    // fixed like the plain next one: never add a second later occurrence.
+    const thisDay = aucklandDateKey(task.calendarStart);
+    const series = (await listSheetTasks()) ?? [];
+    const laterExists = series.some((item) => item.id !== task.id
+      && item.id.replace(OCCURRENCE_SUFFIX, "") === seriesId
+      && taskScheduledDates(item).some((day) => day > thisDay));
+    if (laterExists) return;
+    for (let step = 0; step < 5000 && aucklandDateKey(calendarStart) <= doneDay; step += 1) {
+      calendarStart = nextAucklandOccurrence(calendarStart, recurrence);
+    }
+  }
   const id = `${seriesId}--${recurrence}-${aucklandDateKey(calendarStart)}`;
   const { updatedAt: _updatedAt, ...nextOccurrence } = task;
   await createSheetTask({
@@ -482,6 +501,11 @@ router.patch("/tasks/:taskId", async (req, res): Promise<void> => {
     // offline queue.
     const incoming = { ...body.data };
     if (incoming.calendarStart === "" && incoming.scheduledDates === undefined) delete incoming.calendarStart;
+    // The mirror case: phones on an older app added an empty date list to
+    // every change (a tick, a new priority). Alone, that is not an unschedule
+    // either. Treating it as one wiped one-off tasks' dates on completion and
+    // refused completions of recurring tasks.
+    if (incoming.scheduledDates?.length === 0 && incoming.calendarStart === undefined) delete incoming.scheduledDates;
     const sheetInput = existing.source === "Google Calendar"
       ? withoutClearedCalendarDate(normalizeSheetTaskInput(incoming))
       : normalizeSheetTaskInput(incoming);
@@ -528,7 +552,7 @@ router.patch("/tasks/:taskId", async (req, res): Promise<void> => {
       // A stale retry may be the completion whose first response failed after
       // persisting Done. Reconcile only that idempotent completion intent; all
       // other stale edits retain normal optimistic-concurrency protection.
-      const completionOnly = Object.keys(body.data).every((key) =>
+      const completionOnly = Object.keys(incoming).every((key) =>
         ["task", "done", "baseUpdatedAt", "clientOperationId", "clientTaskId"].includes(key),
       ) && body.data.task === existing.task;
       if (completionOnly && body.data.done === true && existing.done) {
