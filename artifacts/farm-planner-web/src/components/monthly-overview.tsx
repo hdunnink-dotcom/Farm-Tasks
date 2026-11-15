@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { useGetFarmMonthlySummary, getGetFarmMonthlySummaryQueryKey } from '@workspace/api-client-react';
-import { ChevronLeft, ChevronRight, BarChart3, CheckCircle2, AlertCircle, Clock, User, MapPin, Tag, Calendar, HelpCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useGetFarmMonthlySummary, getGetFarmMonthlySummaryQueryKey, type FarmTask } from '@workspace/api-client-react';
+import { ChevronLeft, ChevronRight, BarChart3, CheckCircle2, AlertCircle, Clock, User, MapPin, Tag, Calendar, HelpCircle, Printer } from 'lucide-react';
 import { ErrorState, TaskSkeleton, StatCard } from './farm-planner';
+import { MonthToDoPrintSheet } from './route-print-sheet';
+import { trackEvent } from '@/lib/analytics';
 
 const getMonthString = (date: Date) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 };
 
-export function MonthlyOverview({ accountScope }: { accountScope: string | null }) {
+export function MonthlyOverview({ accountScope, tasks }: { accountScope: string | null; tasks?: FarmTask[] }) {
   const [month, setMonth] = useState(() => getMonthString(new Date()));
 
   const query = useGetFarmMonthlySummary(
@@ -47,7 +50,21 @@ export function MonthlyOverview({ accountScope }: { accountScope: string | null 
             <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Track completion rates and team progress.</p>
           </div>
         </div>
-        <div className="mt-4 flex w-full items-center justify-between md:mt-0 md:w-auto md:justify-end gap-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-1">
+        <div className="mt-4 flex w-full items-center gap-2 md:mt-0 md:w-auto">
+        {tasks && (
+          <button
+            type="button"
+            onClick={() => {
+              trackEvent('tasks_printed', { period: 'month', surface: 'monthly_overview' });
+              window.print();
+            }}
+            data-testid="button-print-month-todo"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2.5 text-sm font-semibold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
+          >
+            <Printer size={16} /> Print to-do
+          </button>
+        )}
+        <div className="flex flex-1 items-center justify-between md:flex-none md:justify-end gap-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-1">
           <button type="button" onClick={handlePrev} aria-label="Previous month" data-testid="button-prev-month" className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors">
             <ChevronLeft size={18} />
           </button>
@@ -57,6 +74,7 @@ export function MonthlyOverview({ accountScope }: { accountScope: string | null 
           <button type="button" onClick={handleNext} aria-label="Next month" data-testid="button-next-month" className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors">
             <ChevronRight size={18} />
           </button>
+        </div>
         </div>
       </div>
 
@@ -126,6 +144,8 @@ export function MonthlyOverview({ accountScope }: { accountScope: string | null 
           </div>
         ) : null}
       </div>
+      {/* The overview sits inside the page, which print hides, so the sheet goes at the end of the document. */}
+      {tasks && createPortal(<MonthToDoPrintSheet tasks={tasks} month={new Date(y, m - 1, 1)} />, document.body)}
     </section>
   );
 }

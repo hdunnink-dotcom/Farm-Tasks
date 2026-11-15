@@ -480,7 +480,7 @@ export default function HomePage() {
           </aside>
         </div>
 
-        {isOwner && <MonthlyOverview accountScope={accountScope} />}
+        {isOwner && <MonthlyOverview accountScope={accountScope} tasks={tasks} />}
       </div>
 
       <TaskFormDialog open={Boolean(accountScope && dialogOpen)} task={accountScope ? editingTask : undefined} error={formError} onClose={() => { stagedCreatedTask.current = null; setDialogOpen(false); }} onSave={handleSave} workers={workers} canAssign={isOwner} />

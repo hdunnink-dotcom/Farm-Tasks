@@ -54,6 +54,37 @@ describe('MonthlyOverview', () => {
     ]
   };
 
+  it('prints the month still to do from the Print to-do button', () => {
+    vi.mocked(useGetFarmMonthlySummary).mockReturnValue({ isLoading: false, isError: false, data: mockSummary, refetch: vi.fn() } as any);
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    const now = new Date();
+    const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-15`;
+    const task = (id: string, title: string, done: boolean) => ({
+      id, task: title, group: 'Orchards', done, urgency: 'High', month: '', location: '', notes: '', link: '', subtasks: [], attachments: [],
+      source: 'Manual', calendarEventId: '', calendarRecurringEventId: '', calendarStart: day, scheduledDates: [day], calendarUpdated: '',
+      updatedAt: '', assigneeId: '', assigneeName: '', assigneeIds: [], assigneeNames: [],
+    }) as any;
+
+    render(<MonthlyOverview accountScope="test-account" tasks={[task('open', 'Cut broom in gully 2', false), task('finished', 'Print the gullies map', true)]} />);
+
+    const sheet = screen.getByTestId('route-print-sheet');
+    expect(sheet.textContent).toContain('Fieldbook · Month to-do');
+    expect(sheet.textContent).toContain('Still to do');
+    expect(screen.getByTestId('route-print-row-open')).toBeTruthy();
+    expect(screen.queryByTestId('route-print-row-finished')).toBeNull();
+    expect(sheet.querySelector('.route-print-instructions')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('button-print-month-todo'));
+    expect(print).toHaveBeenCalled();
+    print.mockRestore();
+  });
+
+  it('shows no print button without the task list', () => {
+    vi.mocked(useGetFarmMonthlySummary).mockReturnValue({ isLoading: false, isError: false, data: mockSummary, refetch: vi.fn() } as any);
+    render(<MonthlyOverview accountScope="test-account" />);
+    expect(screen.queryByTestId('button-print-month-todo')).toBeNull();
+  });
+
   it('renders loading state initially', () => {
     vi.mocked(useGetFarmMonthlySummary).mockReturnValue({
       isLoading: true,
