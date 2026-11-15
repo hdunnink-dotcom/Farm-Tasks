@@ -173,6 +173,54 @@ describe('useOfflineFieldbook', () => {
     expect(updateFarmTask).toHaveBeenCalledTimes(1);
   });
 
+  it('sends a tick without dates, so the task keeps its schedule', async () => {
+    const dated = task({ id: 'gravel', task: 'Add gravel', calendarStart: '2026-11-12', scheduledDates: ['2026-11-12'] } as Partial<TestTask>);
+    listFarmTasks.mockResolvedValue({ tasks: [dated], source: 'Google Sheets' });
+    updateFarmTask.mockResolvedValue({ ...dated, done: true, updatedAt: '2026-11-16T03:00:00.000Z' });
+    setOnline(true);
+    const result = await loadHook();
+    await waitFor(() => expect(result.result.current.tasks).toHaveLength(1));
+
+    await result.result.current.saveTask(result.result.current.tasks[0], { task: dated.task, done: true });
+
+    expect(result.result.current.tasks[0].scheduledDates).toEqual(['2026-11-12']);
+    await waitFor(() => expect(updateFarmTask).toHaveBeenCalledTimes(1));
+    expect(updateFarmTask.mock.calls[0][1]).not.toHaveProperty('scheduledDates');
+    expect(updateFarmTask.mock.calls[0][1]).not.toHaveProperty('calendarStart');
+  });
+
+  it('repairs and retries a stuck tick that carried an empty date list', async () => {
+    const routine = task({ id: 'check-traps', task: 'Check traps', updatedAt: '2026-11-10T00:00:00.000Z' });
+    localStorage.setItem(FALLBACK_KEY, JSON.stringify({
+      tasks: [routine],
+      mutations: [{
+        id: 'stuck-tick',
+        kind: 'update',
+        taskId: routine.id,
+        data: { task: routine.task, done: true, scheduledDates: [] },
+        baseUpdatedAt: routine.updatedAt,
+        createdAt: Date.now(),
+        attempts: 1,
+        nextAttemptAt: Number.MAX_SAFE_INTEGER,
+        lastError: 'Needs attention',
+        serverMessage: 'Weekly tasks require a scheduled calendar start.',
+      }],
+      conflicts: [],
+    }));
+    listFarmTasks.mockResolvedValue({ tasks: [routine], source: 'Google Sheets' });
+    updateFarmTask.mockResolvedValue({ ...routine, done: true, updatedAt: '2026-11-16T03:00:00.000Z' });
+
+    const result = await loadHook();
+    expect(result.result.current.failedMutations).toHaveLength(0);
+    setOnline(true);
+    window.dispatchEvent(new Event('online'));
+
+    await waitFor(() => expect(result.result.current.pendingCount).toBe(0));
+    expect(updateFarmTask).toHaveBeenCalledTimes(1);
+    expect(updateFarmTask.mock.calls[0][1]).toEqual(expect.objectContaining({ task: 'Check traps', done: true }));
+    expect(updateFarmTask.mock.calls[0][1]).not.toHaveProperty('scheduledDates');
+  });
+
   it('queues create, edit, completion, checklist, priority, and delete changes', async () => {
     const result = await loadHook();
     const created = await result.result.current.saveTask(undefined, { task: 'Prune trees', subtasks: [{ id: 'step-1', label: 'Sharpen shears', done: false }] });
