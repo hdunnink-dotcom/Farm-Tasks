@@ -92,6 +92,12 @@ vi.mock('@/components/farm-planner', () => ({
   ErrorState: ({ message }: { message?: string }) => <p role="alert">{message}</p>,
   SyncNotice: () => null,
   UrgencyPill: ({ urgency }: { urgency: string }) => <span data-testid={`status-urgency-${urgency.toLowerCase()}`}>{urgency}</span>,
+  TaskDetailsDialog: ({ task, onEdit }: { task?: FarmTask; onEdit?: (task: FarmTask) => void }) => task ? (
+    <div role="dialog" aria-label="Task details">
+      <p>{task.task}</p>
+      <button type="button" onClick={() => onEdit?.(task)}>Edit</button>
+    </div>
+  ) : null,
 }));
 
 vi.mock('@/components/crew-task-editor', () => ({
@@ -365,6 +371,15 @@ describe('authenticated /crew-plan browser smoke path', () => {
     ));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Full task editor' })).toBeNull());
     expect(state.setLocation).not.toHaveBeenCalled();
+
+    // Clicking a card shows its details; Edit there hands over to the full form.
+    fireEvent.click(screen.getByTestId('board-task-open-edit-task'));
+    const details = await screen.findByRole('dialog', { name: 'Task details' });
+    expect(details.textContent).toContain('Edit orchard notes');
+    fireEvent.click(within(details).getByRole('button', { name: 'Edit' }));
+    expect(screen.queryByRole('dialog', { name: 'Task details' })).toBeNull();
+    expect((await screen.findByRole('dialog', { name: 'Full task editor' })).textContent).toContain('Edit orchard notes');
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Full task editor' })).getByRole('button', { name: 'Close full task' }));
 
     openTaskOptions('Check water troughs');
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Mark complete' }));

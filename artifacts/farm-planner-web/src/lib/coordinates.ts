@@ -11,8 +11,23 @@ function decimal(degrees: string, minutes: string, seconds: string, hemisphere: 
   return 'SW'.includes(hemisphere.toUpperCase()) ? -value : value;
 }
 
+// Google Maps copies a pin as "-41.21045819015103, 172.90732378195517".
+const DECIMAL_PAIR = /^\s*\(?\s*([+-]?\d{1,3}(?:\.\d+)?)\s*(?:,\s*|\s+)([+-]?\d{1,3}(?:\.\d+)?)\s*\)?\s*$/;
+
+function roundCoordinate(value: number) {
+  // Six decimals is about 10 cm, the same precision as the GPS capture.
+  return Number(value.toFixed(6));
+}
+
 export function parseCoordinatePair(value: string): CoordinatePair | null {
   if (!value.trim()) return { latitude: null, longitude: null };
+  const decimalMatch = value.match(DECIMAL_PAIR);
+  if (decimalMatch) {
+    const latitude = Number(decimalMatch[1]);
+    const longitude = Number(decimalMatch[2]);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+    return { latitude: roundCoordinate(latitude), longitude: roundCoordinate(longitude) };
+  }
   const match = value.match(DMS_PAIR);
   if (!match) return null;
   const latitude = decimal(match[1], match[2], match[3], match[4], 90);

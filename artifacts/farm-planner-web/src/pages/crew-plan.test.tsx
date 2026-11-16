@@ -81,7 +81,7 @@ describe('Crew Plan Utilities', () => {
         done: true,
         calendarStart: '2026-08-30',
       });
-      render(<CrewTaskSidebar tasks={[completed, shared, { ...shared }]} onEdit={vi.fn()} />);
+      render(<CrewTaskSidebar tasks={[completed, shared, { ...shared }]} onOpen={vi.fn()} />);
 
       const list = screen.getByTestId('crew-plan-task-list');
       expect(within(list).getAllByText('Shared inspection')).toHaveLength(1);
@@ -92,7 +92,7 @@ describe('Crew Plan Utilities', () => {
     });
 
     it('shows a clear empty state when every task is completed', () => {
-      render(<CrewTaskSidebar tasks={[task({ id: 'completed', task: 'Completed inspection', done: true })]} onEdit={vi.fn()} />);
+      render(<CrewTaskSidebar tasks={[task({ id: 'completed', task: 'Completed inspection', done: true })]} onOpen={vi.fn()} />);
 
       expect(screen.getByText('0 open tasks')).toBeTruthy();
       expect(screen.getByTestId('crew-plan-task-empty')).toBeTruthy();
@@ -102,7 +102,7 @@ describe('Crew Plan Utilities', () => {
 
     it('expands, collapses, and opens a task from the keyboard-accessible panel', () => {
       const onEdit = vi.fn();
-      render(<CrewTaskSidebar tasks={[task({ id: 'edit-me', task: 'Open task' })]} onEdit={onEdit} />);
+      render(<CrewTaskSidebar tasks={[task({ id: 'edit-me', task: 'Open task' })]} onOpen={onEdit} />);
 
       const toggle = screen.getByRole('button', { name: 'Collapse all tasks panel' });
       expect(toggle.getAttribute('aria-expanded')).toBe('true');
@@ -211,7 +211,7 @@ describe('Crew Plan Utilities', () => {
     it('changes urgency in the side list while a click on the task still opens it', async () => {
       const onEdit = vi.fn();
       const onChangeUrgency = vi.fn();
-      render(<CrewTaskSidebar tasks={[task({ id: 'broom', task: 'Cut broom', urgency: 'Low' })]} onEdit={onEdit} onChangeUrgency={onChangeUrgency} />);
+      render(<CrewTaskSidebar tasks={[task({ id: 'broom', task: 'Cut broom', urgency: 'Low' })]} onOpen={onEdit} onChangeUrgency={onChangeUrgency} />);
 
       openUrgency('Urgency Low for Cut broom. Change urgency.');
       fireEvent.click(await waitFor(() => screen.getByRole('menuitem', { name: 'Urgent' })));
@@ -220,6 +220,40 @@ describe('Crew Plan Utilities', () => {
 
       fireEvent.click(screen.getByTestId('crew-task-list-item-broom'));
       expect(onEdit).toHaveBeenCalledWith('broom');
+    });
+  });
+
+  describe('BoardTask details pop-up', () => {
+    function openUrgency(label: string) {
+      const trigger = screen.getByRole('button', { name: label });
+      fireEvent.pointerDown(trigger, { button: 0 });
+      fireEvent.click(trigger);
+    }
+
+    it('opens the details when the card or its title is clicked', () => {
+      const onOpen = vi.fn();
+      render(<BoardTask workers={[]} saveTask={vi.fn()} onEdit={vi.fn()} onOpen={onOpen} visibleDates={['2026-11-02']} task={task({ id: 'prune', task: 'Prune pears', assigneeNames: ['Otto'] })} />);
+
+      fireEvent.click(screen.getByTestId('board-task-assignees-prune'));
+      expect(onOpen).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId('board-task-open-prune'));
+      expect(onOpen).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not open the details from the card controls or their menus', async () => {
+      const onOpen = vi.fn();
+      const saveTask = vi.fn().mockResolvedValue(task({ id: 'prune' }));
+      render(<BoardTask workers={[]} saveTask={saveTask} onEdit={vi.fn()} onOpen={onOpen} visibleDates={['2026-11-02']} task={task({ id: 'prune', task: 'Prune pears' })} />);
+
+      openUrgency('Urgency Medium for Prune pears. Change urgency.');
+      fireEvent.click(await waitFor(() => screen.getByRole('menuitem', { name: 'High' })));
+      const options = screen.getByRole('button', { name: 'Options for Prune pears' });
+      fireEvent.pointerDown(options, { button: 0 });
+      fireEvent.click(options);
+      fireEvent.click(await waitFor(() => screen.getByRole('menuitem', { name: /Move \/ Assign/ })));
+      fireEvent.click(await waitFor(() => screen.getByRole('button', { name: 'Cancel' })));
+
+      expect(onOpen).not.toHaveBeenCalled();
     });
   });
 

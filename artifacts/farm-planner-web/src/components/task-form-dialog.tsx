@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, useMemo } from 'react';
+import { useEffect, useRef, useState, type FormEvent, useMemo } from 'react';
 import { Check, Loader2, Plus, X, Trash2, Paperclip, Camera, FileUp, Crosshair, MapPinned, ExternalLink } from 'lucide-react';
 import { useAuth } from '@clerk/react';
 import { useGetFarmSettings, useRequestFarmAttachmentUpload, useCompleteFarmAttachmentUpload, useDeleteFarmAttachment, getGetFarmSettingsQueryKey, getListFarmTasksQueryKey, type FarmAttachment, type FarmTask, type TaskInput, type TaskRecurrence, type TaskSubtask } from '@workspace/api-client-react';
@@ -58,6 +58,19 @@ const blankDraft: TaskDraft = {
   scheduledDates: [],
 };
 
+/** Adds https:// to a pasted link that has no scheme, so "atlas.co/..." still saves. */
+export function normalizeTaskLink(value: string | null | undefined): string | null {
+  const trimmed = (value ?? '').trim();
+  if (!trimmed) return '';
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(withScheme);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? withScheme : null;
+  } catch {
+    return null;
+  }
+}
+
 const TASK_RECURRENCES = new Set<TaskRecurrence>([
   'none',
   'weekly',
@@ -93,6 +106,10 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
   const [linkedDate, setLinkedDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [validationError, setValidationError] = useState('');
+  const fieldRefs = useRef<Record<'name' | 'schedule' | 'coordinates' | 'atlasLink' | 'link', HTMLElement | null>>({
+    name: null, schedule: null, coordinates: null, atlasLink: null, link: null,
+  });
   
   const { isSignedIn } = useAuth();
   const canAttach = AUTH_DISABLED || isSignedIn;
@@ -139,6 +156,7 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
       setLinkedDate('');
       setSubmitting(false);
       setSubmitError('');
+      setValidationError('');
     }
   }, [open, task, initialDraft, settingsQuery.data]);
 
@@ -174,15 +192,40 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending || submitting) return;
+    setValidationError('');
+    // Problems are shown next to the button as well as at the field, and the
+    // form scrolls to the field, so a long form never fails out of sight.
+    const block = (field: keyof typeof fieldRefs.current, message: string) => {
+      setValidationError(`Not saved yet. ${message}`);
+      const element = fieldRefs.current[field];
+      element?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      if (element instanceof HTMLInputElement) element.focus({ preventScroll: true });
+    };
+    if (!draft.task.trim()) {
+      block('name', 'Give the task a name.');
+      return;
+    }
     const coordinates = parseCoordinatePair(coordinateText);
     if (!coordinates) {
-      setLocationStatus('Enter coordinates like 41°12\'59.40"S 172°54\'26.16"E.');
+      setLocationStatus('Enter coordinates like -41.210458, 172.907324 or 41°12\'59.40"S 172°54\'26.16"E.');
+      block('coordinates', 'The coordinates were not recognised. Paste them straight from Google Maps, e.g. -41.210458, 172.907324.');
+      return;
+    }
+    const atlasLink = normalizeTaskLink(draft.atlasLink);
+    if (atlasLink === null) {
+      block('atlasLink', 'The Atlas map link is not a valid web address.');
+      return;
+    }
+    const link = normalizeTaskLink(draft.link);
+    if (link === null) {
+      block('link', 'The reference link is not a valid web address.');
       return;
     }
     const calendarStart = draft.calendarStart?.trim() ?? '';
     const normalizedCalendarStart = normalizeTaskSchedule(calendarStart);
     if (normalizedCalendarStart === null) {
       setCalendarError('Enter a valid Pacific/Auckland date and optional time.');
+      block('schedule', 'The scheduled date or time is not valid.');
       return;
     }
     const primaryDay = normalizedCalendarStart ? calendarStartDayKey(normalizedCalendarStart) : null;
@@ -193,6 +236,9 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
       setCalendarError(draft.recurrence === 'weekly'
         ? 'Weekly tasks require one scheduled date and time.'
         : 'Recurring tasks require one scheduled date and time.');
+      block('schedule', scheduledDates.length > 1
+        ? 'A repeating task can only have one scheduled day. Remove the linked days or set Repeat to "Does not repeat".'
+        : 'A repeating task needs a scheduled date. Pick a day in the calendar or set Repeat to "Does not repeat".');
       return;
     }
     setSubmitting(true);
@@ -201,6 +247,8 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
       await onSave({
         ...draft,
         ...coordinates,
+        atlasLink,
+        link,
         task: draft.task.trim(),
         calendarStart: normalizedCalendarStart,
         scheduledDates,
@@ -305,9 +353,9 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
           <div><p className="font-mono text-[10px] uppercase tracking-[.17em] text-[hsl(var(--muted-foreground))]">{task?.id ? 'Edit task' : 'New task'}</p><h2 id="task-dialog-title" className="mt-1 font-serif text-2xl text-[hsl(var(--foreground))]">{task?.id ? 'Update task' : 'Add a task'}</h2></div>
           <button type="button" onClick={onClose} data-testid="button-close-task-dialog" aria-label="Close task form" className="rounded-full p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><X size={19} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-5 px-5 py-6 md:px-7 md:py-7">
+        <form onSubmit={handleSubmit} noValidate className="space-y-5 px-5 py-6 md:px-7 md:py-7">
           <FormField label="Task name">
-            <input required autoFocus value={draft.task} onChange={(event) => set('task', event.target.value)} data-testid="input-task-name" placeholder="e.g. Mulch the young pear row" className="field-input text-base" />
+            <input ref={(element) => { fieldRefs.current.name = element; }} required autoFocus value={draft.task} onChange={(event) => { set('task', event.target.value); setValidationError(''); }} data-testid="input-task-name" placeholder="e.g. Mulch the young pear row" className="field-input text-base" />
           </FormField>
           <div className="grid gap-5 sm:grid-cols-2">
             <FormField label="Work group">
@@ -321,6 +369,7 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
              <FormField label="Schedule date & time" hint="Pacific/Auckland">
+                <div ref={(element) => { fieldRefs.current.schedule = element; }} className="scroll-mt-24" />
                 <ScheduledDatePicker value={draft.calendarStart ?? ''} onChange={(value) => {
                   setDraft((current) => {
                     const priorPrimaryDay = calendarStartDayKey(current.calendarStart ?? '');
@@ -334,6 +383,7 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
                     };
                   });
                   setCalendarError('');
+                  setValidationError('');
                 }} requireDate={task?.source === 'Google Calendar'} />
                <div className="mt-3 border-t border-[hsl(var(--border))] pt-3">
                  <p className="text-xs font-semibold text-[hsl(var(--foreground))]">Add linked days</p>
@@ -362,6 +412,7 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
                     if (!TASK_RECURRENCES.has(value as TaskRecurrence)) return;
                     set('recurrence', value as TaskRecurrence);
                     setCalendarError('');
+                    setValidationError('');
                   }}
                >
                  <SelectTrigger
@@ -454,12 +505,12 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
               </a>
             </div>
             {locationStatus && <p className="mt-2 text-xs leading-5 text-[hsl(var(--primary))]" role="status">{locationStatus}</p>}
-             <div className="mt-3"><FormField label="Coordinates" hint="Use degrees, minutes, seconds: 41°12'59.40&quot;S 172°54'26.16&quot;E."><input value={coordinateText} onChange={(event) => setCoordinateText(event.target.value)} data-testid="input-task-coordinates" placeholder={'41°12\'59.40"S 172°54\'26.16"E'} className="field-input" /></FormField></div>
-            <div className="mt-3"><FormField label="Atlas shared map link" hint="Optional. Paste a shared Atlas link to make it available from this task."><input type="url" value={draft.atlasLink ?? ''} onChange={(event) => set('atlasLink', event.target.value)} data-testid="input-task-atlas-link" placeholder="https://…" className="field-input" /></FormField></div>
+             <div className="mt-3"><FormField label="Coordinates" hint="Paste from Google Maps (-41.210458, 172.907324) or use degrees, minutes, seconds (41°12'59.40&quot;S 172°54'26.16&quot;E)."><input ref={(element) => { fieldRefs.current.coordinates = element; }} value={coordinateText} onChange={(event) => { setCoordinateText(event.target.value); setValidationError(''); }} data-testid="input-task-coordinates" inputMode="text" placeholder="-41.210458, 172.907324" className="field-input" /></FormField></div>
+            <div className="mt-3"><FormField label="Atlas shared map link" hint="Optional. Paste a shared Atlas link to make it available from this task."><input ref={(element) => { fieldRefs.current.atlasLink = element; }} type="url" value={draft.atlasLink ?? ''} onChange={(event) => { set('atlasLink', event.target.value); setValidationError(''); }} data-testid="input-task-atlas-link" placeholder="https://…" className="field-input" /></FormField></div>
           </div>
           <FormField label="Notes" hint="Add the context someone needs when they pick this up."><textarea value={draft.notes} onChange={(event) => set('notes', event.target.value)} data-testid="textarea-task-notes" rows={3} placeholder="Tools, conditions, or a useful reminder…" className="field-input min-h-24 resize-y" /></FormField>
           <FormField label="Steps" hint="One step per line."><textarea value={subtasksText} onChange={(event) => setSubtasksText(event.target.value)} data-testid="textarea-task-subtasks" rows={3} placeholder="Check soil moisture&#10;Stage wheelbarrow" className="field-input min-h-24 resize-y" /></FormField>
-          <FormField label="Reference link"><input type="url" value={draft.link} onChange={(event) => set('link', event.target.value)} data-testid="input-task-link" placeholder="https://…" className="field-input" /></FormField>
+          <FormField label="Reference link"><input ref={(element) => { fieldRefs.current.link = element; }} type="url" value={draft.link} onChange={(event) => { set('link', event.target.value); setValidationError(''); }} data-testid="input-task-link" placeholder="https://…" className="field-input" /></FormField>
           
            <FormField label="Attachments" hint={task?.id ? (AUTH_DISABLED ? 'Photos and files can be added while no-login testing is enabled.' : 'Photos and files stay private to approved farm members.') : 'Choose attachments now; they will upload after this task is saved.'}>
              <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.5)] p-4">
@@ -532,10 +583,11 @@ export function TaskFormDialog({ open, task, pending = false, error, onClose, on
              </div>
            </FormField>
 
+          {validationError && <p className="rounded-xl bg-[hsl(5_61%_49%/.09)] px-3 py-2.5 text-xs text-[hsl(var(--destructive))]" role="alert" data-testid="status-form-validation">{validationError}</p>}
           {(error || submitError) && <p className="rounded-xl bg-[hsl(5_61%_49%/.09)] px-3 py-2.5 text-xs text-[hsl(var(--destructive))]" data-testid="status-form-error">{submitError || error}</p>}
           <div className="flex flex-col-reverse gap-3 border-t border-[hsl(var(--border))] pt-5 sm:flex-row sm:justify-end">
             <button type="button" onClick={onClose} data-testid="button-cancel-task" className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">Cancel</button>
-            <button type="submit" disabled={pending || submitting || !draft.task.trim()} data-testid="button-save-task" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-2.5 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">{pending || submitting ? <Loader2 size={15} className="animate-spin" /> : task?.id ? <Check size={15} /> : <Plus size={15} />}{pending || submitting ? 'Saving…' : task?.id ? 'Save changes' : 'Add to the board'}</button>
+            <button type="submit" disabled={pending || submitting} data-testid="button-save-task" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-2.5 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">{pending || submitting ? <Loader2 size={15} className="animate-spin" /> : task?.id ? <Check size={15} /> : <Plus size={15} />}{pending || submitting ? 'Saving…' : task?.id ? 'Save changes' : 'Add to the board'}</button>
           </div>
         </form>
       </section>
