@@ -25,6 +25,7 @@ import {
   X,
   Maximize2,
   Users,
+  Pencil,
 } from 'lucide-react';
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { getListFarmTasksQueryKey, type FarmTask, useListFarmTasks } from '@workspace/api-client-react';
@@ -471,7 +472,7 @@ export function TaskCard({ task, onToggle, onEdit, onDelete, onOpen, onToggleSub
   );
 }
 
-export function TaskDetailsDialog({ task, onClose }: { task?: FarmTask; onClose: () => void }) {
+export function TaskDetailsDialog({ task, onClose, onEdit }: { task?: FarmTask; onClose: () => void; /** Shows an Edit button that hands over to the full task form. */ onEdit?: (task: FarmTask) => void }) {
   const [fullScreenPhoto, setFullScreenPhoto] = useState<string | null>(null);
   const photoTriggerRef = useRef<HTMLButtonElement | null>(null);
   if (!task) return null;
@@ -487,7 +488,8 @@ export function TaskDetailsDialog({ task, onClose }: { task?: FarmTask; onClose:
         <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] w-full overflow-y-auto rounded-t-[1.75rem] border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-2xl outline-none lg:bottom-auto lg:left-1/2 lg:top-1/2 lg:max-w-2xl lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[1.75rem]">
         <div className="sticky top-0 z-10 flex items-start justify-between border-b border-[hsl(var(--border))] bg-[hsl(42_45%_97%/.95)] px-5 py-4 backdrop-blur-md lg:px-7">
           <div><p className="font-mono text-[10px] uppercase tracking-[.17em] text-[hsl(var(--muted-foreground))]">Task details</p><Dialog.Title className="mt-1 font-serif text-3xl leading-tight text-[hsl(var(--foreground))]">{task.task}</Dialog.Title></div>
-          <Dialog.Close asChild><button type="button" aria-label="Close task details" data-testid="button-close-task-details" className="flex size-11 shrink-0 items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><X size={19} /></button></Dialog.Close>
+          <div className="flex shrink-0 items-center gap-1">{onEdit && <button type="button" onClick={() => onEdit(task)} data-testid="button-edit-task-details" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[hsl(var(--border))] px-3 text-xs font-semibold text-[hsl(var(--primary))] hover:bg-[hsl(var(--muted))]"><Pencil size={14} aria-hidden="true" /> Edit</button>}
+          <Dialog.Close asChild><button type="button" aria-label="Close task details" data-testid="button-close-task-details" className="flex size-11 shrink-0 items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><X size={19} /></button></Dialog.Close></div>
         </div>
         <Dialog.Description className="sr-only">Task information, attachments, location, and schedule.</Dialog.Description>
         <div className="space-y-6 px-5 py-6 lg:px-7">

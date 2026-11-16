@@ -4,7 +4,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 
-import { ConflictNotice, PlannerShell, PageHeader, ErrorState, SyncNotice, UrgencyPill } from '@/components/farm-planner';
+import { ConflictNotice, PlannerShell, PageHeader, ErrorState, SyncNotice, TaskDetailsDialog, UrgencyPill } from '@/components/farm-planner';
 import { CompactTaskCreate } from '@/components/compact-task-create';
 import { CrewTaskEditor } from '@/components/crew-task-editor';
 import { UrgencySelect } from '@/components/urgency-select';
@@ -70,7 +70,7 @@ export function replaceScheduledDate(task: Pick<FarmTask, 'calendarStart' | 'sch
   ])).sort();
 }
 
-export function CrewTaskSidebar({ tasks, onEdit, onChangeUrgency }: { tasks: FarmTask[]; onEdit: (taskId: string) => void; onChangeUrgency?: (task: FarmTask, urgency: FarmTask['urgency']) => void }) {
+export function CrewTaskSidebar({ tasks, onOpen, onChangeUrgency }: { tasks: FarmTask[]; onOpen: (taskId: string) => void; onChangeUrgency?: (task: FarmTask, urgency: FarmTask['urgency']) => void }) {
   const [open, setOpen] = useState(true);
   const orderedTasks = useMemo(() => orderCrewPlanTasks(tasks.filter((task) => !task.done)), [tasks]);
   const taskCountLabel = `${orderedTasks.length} open task${orderedTasks.length === 1 ? '' : 's'}`;
@@ -127,7 +127,8 @@ export function CrewTaskSidebar({ tasks, onEdit, onChangeUrgency }: { tasks: Far
                   <li key={task.id} className="relative">
                     <button
                       type="button"
-                      onClick={() => onEdit(task.id)}
+                      onClick={() => onOpen(task.id)}
+                      aria-label={`Show details: ${task.task}`}
                       className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 text-left transition-colors hover:border-[hsl(var(--primary)/.45)] hover:bg-[hsl(var(--background))]"
                       data-testid={`crew-task-list-item-${task.id}`}
                     >
@@ -157,7 +158,7 @@ export function CrewTaskSidebar({ tasks, onEdit, onChangeUrgency }: { tasks: Far
   );
 }
 
-export function BoardTask({ task, workers, saveTask, onEdit, onDelete, visibleDates, anchoredDate }: { task: FarmTask; workers: Worker[]; saveTask: SaveTask; onEdit: () => void; onDelete?: () => Promise<void>; visibleDates: string[]; anchoredDate?: string }) {
+export function BoardTask({ task, workers, saveTask, onEdit, onOpen, onDelete, visibleDates, anchoredDate }: { task: FarmTask; workers: Worker[]; saveTask: SaveTask; onEdit: () => void; /** Shows the task details pop-up. */ onOpen?: () => void; onDelete?: () => Promise<void>; visibleDates: string[]; anchoredDate?: string }) {
   const [isMoveMenuOpen, setIsMoveMenuOpen] = useState(false);
   const [scheduleAction, setScheduleAction] = useState<'move' | 'copy'>('move');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -252,10 +253,22 @@ export function BoardTask({ task, workers, saveTask, onEdit, onDelete, visibleDa
   const assigneeNamesDisplay = task.assigneeNames?.length ? task.assigneeNames.join(', ') : (task.assigneeName || 'Unassigned');
   const canDelete = Boolean(onDelete && !task.done);
 
+  // A click anywhere on the card shows the details, except on its own controls
+  // (urgency, options menu) and inside its pop-ups, which React bubbles here
+  // through their portals even though they sit elsewhere on the page.
+  const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!onOpen) return;
+    const target = event.target as Element;
+    if (!event.currentTarget.contains(target)) return;
+    if (target.closest('button, a, input, select, textarea, label, [role="menuitem"], [role="combobox"], [role="listbox"]')) return;
+    onOpen();
+  };
+
   return (
     <div 
       draggable={!task.done}
       onDragStart={handleDragStart}
+      onClick={handleCardClick}
       aria-label={task.done ? `Completed task: ${task.task}` : `Open task: ${task.task}`}
       className={`group relative mb-2 rounded-xl border p-2.5 shadow-sm transition-all ${task.done ? 'cursor-default border-[hsl(var(--border)/.7)] bg-[hsl(var(--muted)/.45)] opacity-75' : 'cursor-grab border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--primary)/.4)] hover:shadow-md active:cursor-grabbing'} ${isSaving ? 'pointer-events-none opacity-50' : ''}`}
       data-testid={`board-task-${task.id}`}
@@ -271,7 +284,9 @@ export function BoardTask({ task, workers, saveTask, onEdit, onDelete, visibleDa
           void saveTask(task, { task: task.task, urgency }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not change the urgency.'));
         }} />}
       </div>
-      <h4 className={`line-clamp-2 text-xs font-semibold leading-snug text-[hsl(var(--foreground))] ${task.done ? 'line-through decoration-[hsl(var(--muted-foreground)/.7)]' : ''}`}>{task.task}</h4>
+      <h4 className={`line-clamp-2 text-xs font-semibold leading-snug text-[hsl(var(--foreground))] ${task.done ? 'line-through decoration-[hsl(var(--muted-foreground)/.7)]' : ''}`}>{onOpen
+        ? <button type="button" onClick={onOpen} className="text-left hover:underline focus-visible:underline focus-visible:outline-none" data-testid={`board-task-open-${task.id}`}>{task.task}</button>
+        : task.task}</h4>
       <p className="mt-1 pr-6 text-[10px] text-[hsl(var(--muted-foreground))] truncate" data-testid={`board-task-assignees-${task.id}`}>
         {assigneeNamesDisplay}
       </p>
@@ -408,6 +423,7 @@ function BoardCell({
   workers,
   saveTask,
   onEdit,
+  onOpen,
   onDelete,
   onDragError,
   visibleDates
@@ -420,6 +436,7 @@ function BoardCell({
   workers: Worker[];
   saveTask: SaveTask;
   onEdit: (taskId: string) => void;
+  onOpen: (taskId: string) => void;
   onDelete: (task: FarmTask) => Promise<void>;
   onDragError: (message: string) => void;
   visibleDates: string[];
@@ -464,6 +481,7 @@ function BoardCell({
           workers={workers}
           saveTask={saveTask}
           onEdit={() => onEdit(t.id)}
+          onOpen={() => onOpen(t.id)}
            onDelete={() => onDelete(t)}
           visibleDates={visibleDates}
            anchoredDate={dateKey}
@@ -506,6 +524,9 @@ export default function CrewPlanPage() {
   // The full task form opens over the board, so saving returns here.
   const [editor, setEditor] = useState<{ taskId?: string; initialDraft?: TaskInput } | null>(null);
   const openEditor = useCallback((taskId: string) => setEditor({ taskId }), []);
+  // Clicking a task shows its details first; Edit in that pop-up opens the full form.
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const openDetails = useCallback((taskId: string) => setDetailTaskId(taskId), []);
   const changeUrgency = useCallback((task: FarmTask, urgency: FarmTask['urgency']) => {
     setBoardError('');
     void saveTask(task, { task: task.task, urgency }).catch((cause: unknown) => setBoardError(cause instanceof Error ? cause.message : 'Could not change the urgency.'));
@@ -783,6 +804,7 @@ export default function CrewPlanPage() {
                           workers={activeWorkers}
                           saveTask={saveTask}
                            onEdit={(taskId) => openEditor(taskId)}
+                           onOpen={openDetails}
                            onDelete={handleDeleteTask}
                            onDragError={setBoardError}
                           visibleDates={dates}
@@ -795,7 +817,7 @@ export default function CrewPlanPage() {
             </tbody>
           </table>
         </div>
-        <CrewTaskSidebar tasks={tasks} onEdit={(taskId) => openEditor(taskId)} onChangeUrgency={me?.role === 'master' ? changeUrgency : undefined} />
+        <CrewTaskSidebar tasks={tasks} onOpen={openDetails} onChangeUrgency={me?.role === 'master' ? changeUrgency : undefined} />
         </div>
         </div>
       ) : (
@@ -820,6 +842,12 @@ export default function CrewPlanPage() {
           setEditor({ initialDraft: draft });
         }}
       />}
+
+      <TaskDetailsDialog
+        task={detailTaskId ? tasks.find((task) => task.id === detailTaskId) : undefined}
+        onClose={() => setDetailTaskId(null)}
+        onEdit={(task) => { setDetailTaskId(null); openEditor(task.id); }}
+      />
 
       {editor && (!editor.taskId || editorTask) && <CrewTaskEditor
         task={editorTask}

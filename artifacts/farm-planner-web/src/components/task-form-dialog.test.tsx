@@ -243,6 +243,49 @@ describe('TaskFormDialog schedule', () => {
     expect(screen.getByText('Recurring tasks require one scheduled date and time.')).toBeTruthy();
   });
 
+  it('explains next to the button why a repeating task without a date was not saved', () => {
+    const onSave = vi.fn();
+    render(<TaskFormDialog open onClose={vi.fn()} onSave={onSave} initialDraft={{ task: 'Check traps', recurrence: 'monthly' }} />);
+    fireEvent.click(screen.getByTestId('button-save-task'));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByTestId('status-form-validation').textContent).toContain('A repeating task needs a scheduled date');
+  });
+
+  it('saves a pin pasted from Google Maps', () => {
+    const onSave = vi.fn();
+    render(<TaskFormDialog open onClose={vi.fn()} onSave={onSave} initialDraft={{ task: 'Check traps' }} />);
+    fireEvent.change(screen.getByTestId('input-task-coordinates'), { target: { value: '-41.21045819015103, 172.90732378195517' } });
+    fireEvent.click(screen.getByTestId('button-save-task'));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ latitude: -41.210458, longitude: 172.907324 }), []);
+  });
+
+  it('explains unrecognised coordinates next to the button', () => {
+    const onSave = vi.fn();
+    render(<TaskFormDialog open onClose={vi.fn()} onSave={onSave} initialDraft={{ task: 'Check traps' }} />);
+    fireEvent.change(screen.getByTestId('input-task-coordinates'), { target: { value: 'near the gate' } });
+    fireEvent.click(screen.getByTestId('button-save-task'));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByTestId('status-form-validation').textContent).toContain('coordinates were not recognised');
+  });
+
+  it('adds https:// to links pasted without it instead of blocking the save', () => {
+    const onSave = vi.fn();
+    render(<TaskFormDialog open onClose={vi.fn()} onSave={onSave} initialDraft={{ task: 'Check traps' }} />);
+    fireEvent.change(screen.getByTestId('input-task-atlas-link'), { target: { value: 'atlas.co/maps/abc' } });
+    fireEvent.change(screen.getByTestId('input-task-link'), { target: { value: 'www.biogro.co.nz' } });
+    fireEvent.click(screen.getByTestId('button-save-task'));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ atlasLink: 'https://atlas.co/maps/abc', link: 'https://www.biogro.co.nz' }), []);
+  });
+
+  it('asks for a task name next to the button instead of greying it out', () => {
+    const onSave = vi.fn();
+    render(<TaskFormDialog open onClose={vi.fn()} onSave={onSave} />);
+    expect(screen.getByTestId('button-save-task')).toHaveProperty('disabled', false);
+    fireEvent.click(screen.getByTestId('button-save-task'));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByTestId('status-form-validation').textContent).toContain('Give the task a name');
+  });
+
   it('maps legacy weekly tasks to weekly and saves the canonical recurrence', () => {
     const onSave = vi.fn();
     render(<TaskFormDialog open onClose={vi.fn()} onSave={onSave} initialDraft={{ task: 'Check traps', calendarStart: '2026-09-14', repeatWeekly: true }} />);
